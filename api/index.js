@@ -262,6 +262,28 @@ app.get('/api/products/categories', (req, res) => {
   res.json(cats);
 });
 
+// Admin only: Update product stock / inventory level
+app.patch('/api/products/:id/stock', (req, res) => {
+  const { stockQuantity, requesterId } = req.body;
+
+  // Authorization: only administrators may adjust inventory
+  const requester = db.users.find(u => u.id === parseInt(requesterId));
+  if (!requester || requester.role !== 'ADMIN') {
+    return res.status(403).json({ error: 'Only administrators can update inventory' });
+  }
+
+  const product = db.products.find(p => p.id === parseInt(req.params.id));
+  if (!product) return res.status(404).json({ error: 'Product not found' });
+
+  const qty = Number(stockQuantity);
+  if (!Number.isInteger(qty) || qty < 0) {
+    return res.status(400).json({ error: 'Stock quantity must be a non-negative whole number' });
+  }
+
+  product.stockQuantity = qty;
+  res.json(product);
+});
+
 // Orders
 app.get('/api/orders', (req, res) => {
   const { status, employeeId, shopId } = req.query;
@@ -282,6 +304,18 @@ app.post('/api/orders', (req, res) => {
   const employee = db.users.find(u => u.id === parseInt(employeeId));
   if (!shop) return res.status(404).json({ error: 'Shop not found' });
   if (!employee) return res.status(404).json({ error: 'Employee not found' });
+
+  // Validate stock availability up front so we never partially deduct on failure
+  for (const it of items) {
+    const prod = db.products.find(p => p.id === parseInt(it.productId));
+    if (!prod || !(it.quantity > 0)) continue;
+    if (prod.stockQuantity <= 0) {
+      return res.status(400).json({ error: `${prod.name} is out of stock` });
+    }
+    if (it.quantity > prod.stockQuantity) {
+      return res.status(400).json({ error: `Only ${prod.stockQuantity} unit(s) of ${prod.name} in stock` });
+    }
+  }
 
   let subtotal = 0;
   const orderItems = [];

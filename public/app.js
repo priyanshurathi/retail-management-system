@@ -575,10 +575,34 @@ function renderProducts() {
 
     filtered.forEach(prod => {
         const qtyInCart = state.cart[prod.id] || 0;
+        const stock = prod.stockQuantity ?? 0;
+        const outOfStock = stock <= 0;
+        const lowStock = !outOfStock && stock <= 20;
         const card = document.createElement('div');
-        card.className = `custom-card p-4 flex flex-col justify-between relative overflow-hidden transition-all ${qtyInCart > 0 ? 'ring-2 ring-blue-500 bg-blue-50/20' : ''}`;
-        
+        card.className = `custom-card p-4 flex flex-col justify-between relative overflow-hidden transition-all ${outOfStock ? 'opacity-75 grayscale-[35%]' : ''} ${qtyInCart > 0 ? 'ring-2 ring-blue-500 bg-blue-50/20' : ''}`;
+
+        const stockBadge = outOfStock
+            ? `<span class="text-[10px] font-extrabold text-rose-600 uppercase tracking-wide">● Out of Stock</span>`
+            : `<span class="text-[10px] font-bold uppercase tracking-wide ${lowStock ? 'text-amber-600' : 'text-emerald-600'}">${stock} in stock${lowStock ? ' • Low' : ''}</span>`;
+
+        const control = outOfStock
+            ? `<span class="px-3 py-1.5 rounded-xl bg-rose-100 text-rose-700 text-[11px] font-extrabold uppercase">Out of Stock</span>`
+            : `
+                <div class="flex items-center space-x-1 bg-slate-100 p-1 rounded-xl border border-slate-200">
+                    <button onclick="updateCartQuantity(${prod.id}, -1)"
+                        class="w-7 h-7 rounded-lg bg-white hover:bg-slate-200 text-slate-700 font-bold flex items-center justify-center transition active:scale-90 shadow-xs">
+                        -
+                    </button>
+                    <input type="number" min="0" max="${stock}" value="${qtyInCart}" onchange="setCartQuantity(${prod.id}, this.value)"
+                        class="w-10 text-center font-bold text-xs bg-transparent text-slate-800 focus:outline-none">
+                    <button onclick="updateCartQuantity(${prod.id}, 1)"
+                        class="w-7 h-7 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-bold flex items-center justify-center transition active:scale-90 shadow-xs">
+                        +
+                    </button>
+                </div>`;
+
         card.innerHTML = `
+            ${outOfStock ? `<div class="absolute top-2 -right-8 rotate-45 bg-rose-600 text-white text-[9px] font-extrabold uppercase px-8 py-0.5 shadow-sm">Sold Out</div>` : ''}
             <div>
                 <div class="flex items-start justify-between gap-2">
                     <span class="text-2xl p-2 rounded-xl bg-slate-100">${prod.imageUrl || '📦'}</span>
@@ -588,6 +612,7 @@ function renderProducts() {
                     <span class="font-mono text-[10px] text-slate-400 font-semibold">${prod.sku}</span>
                     <h3 class="font-bold text-slate-900 text-sm leading-snug line-clamp-2 mt-0.5">${prod.name}</h3>
                     <p class="text-[11px] text-slate-500 mt-1">${prod.unit}</p>
+                    <div class="mt-1.5">${stockBadge}</div>
                 </div>
             </div>
 
@@ -596,20 +621,7 @@ function renderProducts() {
                     <div class="text-[10px] text-slate-400 uppercase font-semibold">Wholesale Rate</div>
                     <div class="text-base font-extrabold text-blue-700">₹ ${prod.price.toFixed(2)}</div>
                 </div>
-
-                <!-- Quantity Control Stepper -->
-                <div class="flex items-center space-x-1 bg-slate-100 p-1 rounded-xl border border-slate-200">
-                    <button onclick="updateCartQuantity(${prod.id}, -1)" 
-                        class="w-7 h-7 rounded-lg bg-white hover:bg-slate-200 text-slate-700 font-bold flex items-center justify-center transition active:scale-90 shadow-xs">
-                        -
-                    </button>
-                    <input type="number" min="0" value="${qtyInCart}" onchange="setCartQuantity(${prod.id}, this.value)" 
-                        class="w-10 text-center font-bold text-xs bg-transparent text-slate-800 focus:outline-none">
-                    <button onclick="updateCartQuantity(${prod.id}, 1)" 
-                        class="w-7 h-7 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-bold flex items-center justify-center transition active:scale-90 shadow-xs">
-                        +
-                    </button>
-                </div>
+                ${control}
             </div>
         `;
         grid.appendChild(card);
@@ -619,9 +631,19 @@ function renderProducts() {
 }
 
 // Cart Mechanics
+function getAvailableStock(productId) {
+    const prod = state.products.find(p => p.id === parseInt(productId));
+    return prod ? (prod.stockQuantity ?? 0) : 0;
+}
+
 function updateCartQuantity(productId, delta) {
+    const max = getAvailableStock(productId);
     const current = state.cart[productId] || 0;
-    const next = Math.max(0, current + delta);
+    let next = Math.max(0, current + delta);
+    if (next > max) {
+        next = max;
+        if (delta > 0) showToast(`Only ${max} unit(s) in stock`, 'warning');
+    }
     if (next === 0) {
         delete state.cart[productId];
     } else {
@@ -632,7 +654,12 @@ function updateCartQuantity(productId, delta) {
 }
 
 function setCartQuantity(productId, value) {
-    const qty = parseInt(value) || 0;
+    const max = getAvailableStock(productId);
+    let qty = parseInt(value) || 0;
+    if (qty > max) {
+        qty = max;
+        showToast(`Only ${max} unit(s) in stock`, 'warning');
+    }
     if (qty <= 0) {
         delete state.cart[productId];
     } else {
@@ -1053,6 +1080,13 @@ function renderAdminCatalog() {
     tbody.innerHTML = '';
 
     state.products.forEach(p => {
+        const stock = p.stockQuantity ?? 0;
+        const statusBadge = stock <= 0
+            ? '<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-100 text-rose-800">Out of Stock</span>'
+            : stock <= 20
+                ? '<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800">Low Stock</span>'
+                : '<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800">In Stock</span>';
+
         const tr = document.createElement('tr');
         tr.className = 'hover:bg-slate-50';
         tr.innerHTML = `
@@ -1064,13 +1098,56 @@ function renderAdminCatalog() {
             <td class="py-2.5 px-4 text-slate-600">${p.unit}</td>
             <td class="py-2.5 px-4 font-bold text-blue-700">₹ ${p.price.toFixed(2)}</td>
             <td class="py-2.5 px-4">
-                <span class="px-2 py-0.5 rounded-full text-[10px] font-bold ${p.stockQuantity > 20 ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800'}">
-                    ${p.stockQuantity} in stock
-                </span>
+                <div class="flex items-center gap-2">
+                    <input type="number" min="0" value="${stock}" id="stock-input-${p.id}"
+                        class="w-20 px-2 py-1 rounded-lg border border-slate-200 text-xs font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    <button onclick="updateProductStock(${p.id})"
+                        class="px-2.5 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-[11px] font-bold transition active:scale-95">
+                        Update
+                    </button>
+                    ${statusBadge}
+                </div>
             </td>
         `;
         tbody.appendChild(tr);
     });
+}
+
+async function updateProductStock(productId) {
+    if (!state.currentUser || state.currentUser.role !== 'ADMIN') {
+        showToast('Only administrators can update inventory', 'error');
+        return;
+    }
+    const input = document.getElementById(`stock-input-${productId}`);
+    if (!input) return;
+    const qty = parseInt(input.value, 10);
+    if (isNaN(qty) || qty < 0) {
+        showToast('Enter a valid non-negative stock quantity', 'warning');
+        return;
+    }
+
+    try {
+        const res = await fetch(`/api/products/${productId}/stock`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ stockQuantity: qty, requesterId: state.currentUser.id })
+        });
+
+        if (res.ok) {
+            const updated = await res.json();
+            const prod = state.products.find(p => p.id === productId);
+            if (prod) prod.stockQuantity = updated.stockQuantity;
+            renderAdminCatalog();
+            renderProducts();
+            showToast(`Stock updated: ${updated.name} → ${updated.stockQuantity} units`, 'success');
+        } else {
+            const err = await res.json().catch(() => ({}));
+            showToast(err.error || 'Failed to update stock', 'error');
+        }
+    } catch (e) {
+        console.error(e);
+        showToast('Server error while updating stock', 'error');
+    }
 }
 
 function renderAdminShops() {
