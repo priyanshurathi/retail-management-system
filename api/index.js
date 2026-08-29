@@ -13,22 +13,7 @@ const db = {
     { id: 3, username: 'emp002', fullName: 'Priya Patel', role: 'EMPLOYEE', employeeCode: 'EMP002', phone: '+91 98111 00002', territory: 'North City & Civil Lines', password: '1234', active: true },
     { id: 4, username: 'emp003', fullName: 'Amit Kumar', role: 'EMPLOYEE', employeeCode: 'EMP003', phone: '+91 98111 00003', territory: 'West End Retail Corridor', password: '1234', active: true },
     { id: 5, username: 'emp004', fullName: 'Sneha Gupta', role: 'EMPLOYEE', employeeCode: 'EMP004', phone: '+91 98111 00004', territory: 'South Plaza & Commercial Sector', password: '1234', active: true },
-    { id: 6, username: 'emp005', fullName: 'Vikram Singh', role: 'EMPLOYEE', employeeCode: 'EMP005', phone: '+91 98111 00005', territory: 'East Industrial District', password: '1234', active: true },
-    { id: 7, username: 'emp006', fullName: 'Ananya Roy', role: 'EMPLOYEE', employeeCode: 'EMP006', phone: '+91 98111 00006', territory: 'Old Town Traditional Bazaar', password: '1234', active: true },
-    { id: 8, username: 'emp007', fullName: 'Rajesh Verma', role: 'EMPLOYEE', employeeCode: 'EMP007', phone: '+91 98111 00007', territory: 'Metro Line Station Shops', password: '1234', active: true },
-    { id: 9, username: 'emp008', fullName: 'Pooja Joshi', role: 'EMPLOYEE', employeeCode: 'EMP008', phone: '+91 98111 00008', territory: 'Tech Park & Cyber Hub', password: '1234', active: true },
-    { id: 10, username: 'emp009', fullName: 'Deepak Nair', role: 'EMPLOYEE', employeeCode: 'EMP009', phone: '+91 98111 00009', territory: 'Coastal Zone & Port Market', password: '1234', active: true },
-    { id: 11, username: 'emp010', fullName: 'Kavita Reddy', role: 'EMPLOYEE', employeeCode: 'EMP010', phone: '+91 98111 00010', territory: 'Green Park Residential Sector', password: '1234', active: true },
-    { id: 12, username: 'emp011', fullName: 'Suresh Menon', role: 'EMPLOYEE', employeeCode: 'EMP011', phone: '+91 98111 00011', territory: 'Hill View & Valley Shops', password: '1234', active: true },
-    { id: 13, username: 'emp012', fullName: 'Neha Choudhary', role: 'EMPLOYEE', employeeCode: 'EMP012', phone: '+91 98111 00012', territory: 'Riverside Market Link', password: '1234', active: true },
-    { id: 14, username: 'emp013', fullName: 'Manoj Tiwari', role: 'EMPLOYEE', employeeCode: 'EMP013', phone: '+91 98111 00013', territory: 'Commercial Complex Block A', password: '1234', active: true },
-    { id: 15, username: 'emp014', fullName: 'Sunita Das', role: 'EMPLOYEE', employeeCode: 'EMP014', phone: '+91 98111 00014', territory: 'West Gate Junction', password: '1234', active: true },
-    { id: 16, username: 'emp015', fullName: 'Rohit Saxena', role: 'EMPLOYEE', employeeCode: 'EMP015', phone: '+91 98111 00015', territory: 'Highway Logistics Corridor', password: '1234', active: true },
-    { id: 17, username: 'emp016', fullName: 'Meera Iyer', role: 'EMPLOYEE', employeeCode: 'EMP016', phone: '+91 98111 00016', territory: 'Lakeview Promenade Market', password: '1234', active: true },
-    { id: 18, username: 'emp017', fullName: 'Sanjay Mishra', role: 'EMPLOYEE', employeeCode: 'EMP017', phone: '+91 98111 00017', territory: 'City Center Ring Road', password: '1234', active: true },
-    { id: 19, username: 'emp018', fullName: 'Divya Kapoor', role: 'EMPLOYEE', employeeCode: 'EMP018', phone: '+91 98111 00018', territory: 'North Gate Suburbs', password: '1234', active: true },
-    { id: 20, username: 'emp019', fullName: 'Alok Singhal', role: 'EMPLOYEE', employeeCode: 'EMP019', phone: '+91 98111 00019', territory: 'South Extension & Arcade', password: '1234', active: true },
-    { id: 21, username: 'emp020', fullName: 'Ritu Deshmukh', role: 'EMPLOYEE', employeeCode: 'EMP020', phone: '+91 98111 00020', territory: 'University Town & Hostel Zone', password: '1234', active: true }
+    { id: 6, username: 'emp005', fullName: 'Vikram Singh', role: 'EMPLOYEE', employeeCode: 'EMP005', phone: '+91 98111 00005', territory: 'East Industrial District', password: '1234', active: true }
   ],
   shops: [
     { id: 1, name: 'Gupta Kirana & Provisions', ownerName: 'Ramesh Gupta', phone: '+91 98200 11223', address: 'Shop 14, Main Market, Connaught Hub', territory: 'Central Market & Connaught Hub', email: 'guptakirana@gmail.com', gstNumber: '07AAAAA0000A1Z5', active: true },
