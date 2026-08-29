@@ -1,0 +1,745 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Apex B2B Retail Field Orders & Admin System</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: {
+                            50: '#eff6ff',
+                            100: '#dbeafe',
+                            500: '#3b82f6',
+                            600: '#2563eb',
+                            700: '#1d4ed8',
+                            800: '#1e40af',
+                            900: '#1e3a8a',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="stylesheet" href="/styles.css">
+</head>
+<body class="bg-slate-50 min-h-screen flex flex-col antialiased selection:bg-blue-500 selection:text-white">
+
+    <!-- TOP GLOBAL HEADER -->
+    <header class="sticky top-0 z-40 glass-header no-print">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex items-center justify-between h-16">
+                <!-- Brand / Logo -->
+                <div class="flex items-center space-x-3">
+                    <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-blue-600 to-indigo-600 flex items-center justify-center text-white shadow-md shadow-blue-500/20">
+                        <i data-lucide="store" class="w-5 h-5"></i>
+                    </div>
+                    <div>
+                        <div class="flex items-center space-x-2">
+                            <span class="font-bold text-lg text-slate-900 tracking-tight">Apex Retail</span>
+                            <span class="text-xs px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 font-semibold uppercase tracking-wider">B2B Core</span>
+                        </div>
+                        <p class="text-xs text-slate-500 hidden sm:block">Field Sales & Distribution Management</p>
+                    </div>
+                </div>
+
+                <!-- Active Role & Quick Switcher -->
+                <div class="flex items-center space-x-3">
+                    <!-- Switch View / Role Dropdown -->
+                    <div class="relative inline-block text-left">
+                        <div class="flex items-center space-x-2 bg-slate-100 p-1 rounded-xl border border-slate-200">
+                            <button id="view-mode-sales-btn" onclick="switchMainView('field-sales')" 
+                                class="flex items-center space-x-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all bg-white text-blue-600 shadow-sm">
+                                <i data-lucide="smartphone" class="w-3.5 h-3.5"></i>
+                                <span>Field App</span>
+                            </button>
+                            <button id="view-mode-admin-btn" onclick="switchMainView('admin-portal')" 
+                                class="flex items-center space-x-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all text-slate-600 hover:text-slate-900">
+                                <i data-lucide="shield-check" class="w-3.5 h-3.5"></i>
+                                <span>Admin Portal</span>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- User Profile Dropdown / Quick Switcher -->
+                    <div class="relative">
+                        <button onclick="toggleUserDropdown()" class="flex items-center space-x-2 px-3 py-1.5 rounded-xl bg-white border border-slate-200 hover:bg-slate-50 shadow-sm transition">
+                            <div id="user-avatar" class="w-7 h-7 rounded-full bg-blue-600 text-white flex items-center justify-center text-xs font-bold">
+                                RS
+                            </div>
+                            <div class="text-left hidden md:block">
+                                <div id="user-name-display" class="text-xs font-bold text-slate-800 leading-tight">Rahul Sharma</div>
+                                <div id="user-role-display" class="text-[10px] text-slate-500 leading-none">EMP001 • Field Rep</div>
+                            </div>
+                            <i data-lucide="chevron-down" class="w-3.5 h-3.5 text-slate-400"></i>
+                        </button>
+
+                        <!-- User Switch Dropdown Menu -->
+                        <div id="user-switch-menu" class="hidden absolute right-0 mt-2 w-72 bg-white rounded-2xl shadow-xl border border-slate-200 py-2 z-50 animate-in fade-in slide-in-from-top-2">
+                            <div class="px-4 py-2 border-b border-slate-100">
+                                <p class="text-xs font-semibold text-slate-400 uppercase tracking-wider">Quick Demo Switcher</p>
+                                <p class="text-xs text-slate-600 mt-0.5">Switch between Admin & 20 Field Agents</p>
+                            </div>
+                            <div class="max-h-72 overflow-y-auto py-1" id="user-switcher-list">
+                                <!-- Populated dynamically -->
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- MAIN CONTAINER -->
+    <main class="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6">
+
+        <!-- ========================================== -->
+        <!-- VIEW 1: FIELD SALES EMPLOYEE MOBILE APP   -->
+        <!-- ========================================== -->
+        <div id="field-sales-view" class="space-y-6">
+            
+            <!-- Employee Banner & Navigation Tabs -->
+            <div class="bg-gradient-to-r from-blue-700 via-blue-600 to-indigo-700 rounded-2xl p-4 sm:p-6 text-white shadow-lg shadow-blue-900/10">
+                <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                    <div>
+                        <div class="flex items-center space-x-2">
+                            <span class="px-2 py-0.5 rounded-full bg-blue-500/40 text-blue-100 text-xs font-semibold uppercase tracking-wider">Sales Representative</span>
+                            <span id="agent-active-badge" class="px-2 py-0.5 rounded-full bg-emerald-500/30 text-emerald-200 text-xs font-medium flex items-center">
+                                <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 mr-1 animate-pulse"></span> Online
+                            </span>
+                        </div>
+                        <h1 id="field-agent-welcome" class="text-xl sm:text-2xl font-extrabold mt-1">Hello, Rahul Sharma (EMP001)</h1>
+                        <p id="field-agent-territory" class="text-xs sm:text-sm text-blue-100 mt-0.5 flex items-center">
+                            <i data-lucide="map-pin" class="w-3.5 h-3.5 mr-1 text-blue-300"></i> Route: Central Market & Connaught Hub
+                        </p>
+                    </div>
+                    <div class="flex items-center space-x-2">
+                        <button onclick="switchFieldTab('catalog')" id="field-tab-catalog" class="flex-1 sm:flex-initial px-4 py-2 rounded-xl bg-white text-blue-700 font-semibold text-xs shadow-sm transition">
+                            <i data-lucide="shopping-bag" class="w-3.5 h-3.5 inline mr-1"></i> New Order
+                        </button>
+                        <button onclick="switchFieldTab('orders')" id="field-tab-orders" class="flex-1 sm:flex-initial px-4 py-2 rounded-xl bg-blue-800/60 hover:bg-blue-800 text-white font-semibold text-xs transition">
+                            <i data-lucide="clock" class="w-3.5 h-3.5 inline mr-1"></i> My Orders (<span id="agent-orders-count">0</span>)
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- TAB 1: ORDER PLACEMENT SCREEN -->
+            <div id="field-screen-catalog" class="space-y-6">
+                
+                <!-- STEP 1: SHOP SELECTION BAR -->
+                <div class="custom-card p-4 sm:p-5">
+                    <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                        <div class="flex-1">
+                            <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">
+                                Step 1: Select Retail Shop for Order
+                            </label>
+                            <div class="relative">
+                                <i data-lucide="store" class="w-4 h-4 absolute left-3.5 top-3 text-slate-400"></i>
+                                <select id="selected-shop-select" onchange="onShopSelectionChange()" 
+                                    class="w-full pl-10 pr-8 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-semibold text-slate-800 focus:ring-2 focus:ring-blue-500 focus:outline-none appearance-none">
+                                    <option value="">-- Choose Retail Shop from Route --</option>
+                                </select>
+                                <i data-lucide="chevron-down" class="w-4 h-4 absolute right-3 top-3 text-slate-400 pointer-events-none"></i>
+                            </div>
+                        </div>
+
+                        <!-- Active Selected Shop Detail Card -->
+                        <div id="active-shop-summary" class="hidden md:flex items-center space-x-3 bg-blue-50 border border-blue-100 rounded-xl p-3">
+                            <div class="w-9 h-9 rounded-lg bg-blue-600 text-white flex items-center justify-center font-bold text-sm">
+                                <i data-lucide="building" class="w-4 h-4"></i>
+                            </div>
+                            <div class="text-xs">
+                                <div id="card-shop-name" class="font-bold text-slate-900">Gupta Kirana Store</div>
+                                <div class="text-slate-500 flex items-center space-x-2">
+                                    <span id="card-shop-owner">Ramesh Gupta</span>
+                                    <span>•</span>
+                                    <span id="card-shop-phone">+91 98200 11223</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- STEP 2: CATEGORY FILTER & SEARCH -->
+                <div class="space-y-3">
+                    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                        <div>
+                            <h2 class="text-lg font-bold text-slate-900">Pre-defined Product Catalog</h2>
+                            <p class="text-xs text-slate-500">Select items and specify quantities for wholesale dispatch</p>
+                        </div>
+                        <!-- Search Box -->
+                        <div class="relative w-full sm:w-72">
+                            <i data-lucide="search" class="w-4 h-4 absolute left-3.5 top-3 text-slate-400"></i>
+                            <input type="text" id="product-search-input" oninput="filterProducts()" placeholder="Search products or SKU..." 
+                                class="w-full pl-10 pr-4 py-2 bg-white border border-slate-200 rounded-xl text-xs focus:ring-2 focus:ring-blue-500 focus:outline-none shadow-sm">
+                        </div>
+                    </div>
+
+                    <!-- Category Pills -->
+                    <div class="flex items-center space-x-2 overflow-x-auto pb-2 scrollbar-none" id="category-pills-container">
+                        <!-- Populated dynamically -->
+                    </div>
+                </div>
+
+                <!-- PRODUCT CARDS GRID -->
+                <div id="products-grid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                    <!-- Populated dynamically -->
+                </div>
+            </div>
+
+            <!-- TAB 2: AGENT MY ORDERS SCREEN -->
+            <div id="field-screen-orders" class="hidden space-y-4">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <h2 class="text-lg font-bold text-slate-900">My Placed Orders</h2>
+                        <p class="text-xs text-slate-500">Track fulfillment and delivery status for your shops</p>
+                    </div>
+                    <button onclick="loadAgentOrders()" class="px-3 py-1.5 bg-white border border-slate-200 hover:bg-slate-50 rounded-xl text-xs font-semibold text-slate-700 flex items-center space-x-1 shadow-sm">
+                        <i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i>
+                        <span>Refresh</span>
+                    </button>
+                </div>
+                
+                <div id="agent-orders-list" class="space-y-3">
+                    <!-- Populated dynamically -->
+                </div>
+            </div>
+        </div>
+
+        <!-- ========================================== -->
+        <!-- VIEW 2: ADMIN FULFILLMENT & MASTER PORTAL  -->
+        <!-- ========================================== -->
+        <div id="admin-portal-view" class="hidden space-y-6">
+            
+            <!-- Admin Top Navigation Tabs -->
+            <div class="flex flex-wrap items-center justify-between gap-4 border-b border-slate-200 pb-4">
+                <div class="flex items-center space-x-2">
+                    <button onclick="switchAdminTab('orders')" id="adm-tab-orders" class="px-4 py-2 rounded-xl bg-blue-600 text-white font-bold text-xs shadow-sm transition flex items-center space-x-1.5">
+                        <i data-lucide="package-check" class="w-4 h-4"></i>
+                        <span>Orders & Dispatch</span>
+                    </button>
+                    <button onclick="switchAdminTab('analytics')" id="adm-tab-analytics" class="px-4 py-2 rounded-xl bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 font-bold text-xs transition flex items-center space-x-1.5">
+                        <i data-lucide="bar-chart-3" class="w-4 h-4"></i>
+                        <span>Analytics</span>
+                    </button>
+                    <button onclick="switchAdminTab('products')" id="adm-tab-products" class="px-4 py-2 rounded-xl bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 font-bold text-xs transition flex items-center space-x-1.5">
+                        <i data-lucide="boxes" class="w-4 h-4"></i>
+                        <span>Catalog Master</span>
+                    </button>
+                    <button onclick="switchAdminTab('shops')" id="adm-tab-shops" class="px-4 py-2 rounded-xl bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 font-bold text-xs transition flex items-center space-x-1.5">
+                        <i data-lucide="store" class="w-4 h-4"></i>
+                        <span>Retail Shops</span>
+                    </button>
+                    <button onclick="switchAdminTab('employees')" id="adm-tab-employees" class="px-4 py-2 rounded-xl bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 font-bold text-xs transition flex items-center space-x-1.5">
+                        <i data-lucide="users" class="w-4 h-4"></i>
+                        <span>20 Field Agents</span>
+                    </button>
+                </div>
+
+                <div class="flex items-center space-x-2">
+                    <button onclick="refreshAdminData()" class="px-3.5 py-2 bg-slate-900 text-white hover:bg-slate-800 rounded-xl text-xs font-bold flex items-center space-x-1.5 shadow-sm transition">
+                        <i data-lucide="rotate-cw" class="w-3.5 h-3.5"></i>
+                        <span>Live Sync</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- ADMIN TAB 1: ORDERS & DISPATCH BOARD -->
+            <div id="adm-screen-orders" class="space-y-6">
+                
+                <!-- KPI Stat Cards -->
+                <div class="grid grid-cols-2 lg:grid-cols-5 gap-3 sm:gap-4">
+                    <div class="custom-card p-4">
+                        <div class="flex items-center justify-between">
+                            <span class="text-xs font-bold text-slate-400 uppercase">Total Revenue</span>
+                            <span class="p-2 rounded-xl bg-emerald-50 text-emerald-600"><i data-lucide="indian-rupee" class="w-4 h-4"></i></span>
+                        </div>
+                        <div id="kpi-total-revenue" class="text-xl sm:text-2xl font-extrabold text-slate-900 mt-2">₹ 0.00</div>
+                        <p class="text-[11px] text-slate-500 mt-0.5">Across all fulfilled orders</p>
+                    </div>
+
+                    <div class="custom-card p-4">
+                        <div class="flex items-center justify-between">
+                            <span class="text-xs font-bold text-slate-400 uppercase">Total Orders</span>
+                            <span class="p-2 rounded-xl bg-blue-50 text-blue-600"><i data-lucide="shopping-cart" class="w-4 h-4"></i></span>
+                        </div>
+                        <div id="kpi-total-orders" class="text-xl sm:text-2xl font-extrabold text-slate-900 mt-2">0</div>
+                        <p class="text-[11px] text-slate-500 mt-0.5">From 20 field agents</p>
+                    </div>
+
+                    <div class="custom-card p-4 border-amber-200 bg-amber-50/40">
+                        <div class="flex items-center justify-between">
+                            <span class="text-xs font-bold text-amber-700 uppercase">Pending Orders</span>
+                            <span class="p-2 rounded-xl bg-amber-100 text-amber-600"><i data-lucide="clock" class="w-4 h-4"></i></span>
+                        </div>
+                        <div id="kpi-pending-orders" class="text-xl sm:text-2xl font-extrabold text-amber-900 mt-2">0</div>
+                        <p class="text-[11px] text-amber-700 mt-0.5">Needs dispatch action</p>
+                    </div>
+
+                    <div class="custom-card p-4">
+                        <div class="flex items-center justify-between">
+                            <span class="text-xs font-bold text-slate-400 uppercase">Shipped</span>
+                            <span class="p-2 rounded-xl bg-indigo-50 text-indigo-600"><i data-lucide="truck" class="w-4 h-4"></i></span>
+                        </div>
+                        <div id="kpi-shipped-orders" class="text-xl sm:text-2xl font-extrabold text-indigo-900 mt-2">0</div>
+                        <p class="text-[11px] text-slate-500 mt-0.5">Out for delivery</p>
+                    </div>
+
+                    <div class="custom-card p-4">
+                        <div class="flex items-center justify-between">
+                            <span class="text-xs font-bold text-slate-400 uppercase">Delivered / Done</span>
+                            <span class="p-2 rounded-xl bg-emerald-50 text-emerald-600"><i data-lucide="check-circle" class="w-4 h-4"></i></span>
+                        </div>
+                        <div id="kpi-done-orders" class="text-xl sm:text-2xl font-extrabold text-emerald-900 mt-2">0</div>
+                        <p class="text-[11px] text-slate-500 mt-0.5">Billed & completed</p>
+                    </div>
+                </div>
+
+                <!-- ORDER PIPELINE & FILTER BAR -->
+                <div class="custom-card p-4 sm:p-5 space-y-4">
+                    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                        <!-- Status Filter Tabs -->
+                        <div class="flex items-center space-x-1.5 bg-slate-100 p-1 rounded-xl overflow-x-auto">
+                            <button onclick="filterAdminOrders('ALL')" id="filter-status-ALL" class="px-3 py-1.5 rounded-lg text-xs font-bold transition bg-white text-blue-600 shadow-sm">
+                                All (<span id="count-all">0</span>)
+                            </button>
+                            <button onclick="filterAdminOrders('PENDING')" id="filter-status-PENDING" class="px-3 py-1.5 rounded-lg text-xs font-bold text-slate-600 hover:text-slate-900 transition">
+                                ⏳ Pending (<span id="count-pending">0</span>)
+                            </button>
+                            <button onclick="filterAdminOrders('SHIPPED')" id="filter-status-SHIPPED" class="px-3 py-1.5 rounded-lg text-xs font-bold text-slate-600 hover:text-slate-900 transition">
+                                🚚 Shipped (<span id="count-shipped">0</span>)
+                            </button>
+                            <button onclick="filterAdminOrders('DONE')" id="filter-status-DONE" class="px-3 py-1.5 rounded-lg text-xs font-bold text-slate-600 hover:text-slate-900 transition">
+                                ✅ Done (<span id="count-done">0</span>)
+                            </button>
+                        </div>
+
+                        <!-- Search Box in Orders Table -->
+                        <div class="relative w-full sm:w-64">
+                            <i data-lucide="search" class="w-4 h-4 absolute left-3.5 top-2.5 text-slate-400"></i>
+                            <input type="text" id="admin-order-search" oninput="renderAdminOrdersTable()" placeholder="Search order, shop, agent..." 
+                                class="w-full pl-10 pr-4 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:ring-2 focus:ring-blue-500 focus:outline-none">
+                        </div>
+                    </div>
+
+                    <!-- ORDERS TABLE -->
+                    <div class="overflow-x-auto rounded-xl border border-slate-200">
+                        <table class="w-full text-left border-collapse text-xs">
+                            <thead>
+                                <tr class="bg-slate-50/80 border-b border-slate-200 text-slate-500 font-bold uppercase tracking-wider">
+                                    <th class="py-3.5 px-4">Order # / Time</th>
+                                    <th class="py-3.5 px-4">Retail Shop</th>
+                                    <th class="py-3.5 px-4">Field Agent</th>
+                                    <th class="py-3.5 px-4">Items / Total</th>
+                                    <th class="py-3.5 px-4">Payment</th>
+                                    <th class="py-3.5 px-4">Status</th>
+                                    <th class="py-3.5 px-4 text-right">Actions & Bill</th>
+                                </tr>
+                            </thead>
+                            <tbody id="admin-orders-table-body" class="divide-y divide-slate-100 bg-white">
+                                <!-- Populated dynamically -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ADMIN TAB 2: ANALYTICS DASHBOARD -->
+            <div id="adm-screen-analytics" class="hidden space-y-6">
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    <!-- Top 5 Field Sales Reps Leaderboard -->
+                    <div class="custom-card p-5">
+                        <div class="flex items-center justify-between mb-4">
+                            <div>
+                                <h3 class="font-bold text-slate-900 text-sm">Top Field Representatives (Leaderboard)</h3>
+                                <p class="text-xs text-slate-500">Sales volume ranking among the 20 field agents</p>
+                            </div>
+                            <span class="p-2 rounded-xl bg-amber-50 text-amber-600"><i data-lucide="trophy" class="w-4 h-4"></i></span>
+                        </div>
+                        <div id="top-employees-list" class="space-y-3">
+                            <!-- Populated dynamically -->
+                        </div>
+                    </div>
+
+                    <!-- Top Selling Products -->
+                    <div class="custom-card p-5">
+                        <div class="flex items-center justify-between mb-4">
+                            <div>
+                                <h3 class="font-bold text-slate-900 text-sm">Top Demanded Products</h3>
+                                <p class="text-xs text-slate-500">Best-sellers by units ordered across retail shops</p>
+                            </div>
+                            <span class="p-2 rounded-xl bg-blue-50 text-blue-600"><i data-lucide="flame" class="w-4 h-4"></i></span>
+                        </div>
+                        <div id="top-products-list" class="space-y-3">
+                            <!-- Populated dynamically -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ADMIN TAB 3: CATALOG MASTER -->
+            <div id="adm-screen-products" class="hidden space-y-4">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <h2 class="text-lg font-bold text-slate-900">Master Product Catalog</h2>
+                        <p class="text-xs text-slate-500">Manage wholesale pricing, stock availability, and units</p>
+                    </div>
+                </div>
+                <div class="custom-card overflow-hidden">
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left text-xs">
+                            <thead class="bg-slate-50 border-b border-slate-200 text-slate-500 uppercase font-bold">
+                                <tr>
+                                    <th class="py-3 px-4">SKU</th>
+                                    <th class="py-3 px-4">Product Name</th>
+                                    <th class="py-3 px-4">Category</th>
+                                    <th class="py-3 px-4">Packaging Unit</th>
+                                    <th class="py-3 px-4">Wholesale Rate</th>
+                                    <th class="py-3 px-4">Stock Level</th>
+                                </tr>
+                            </thead>
+                            <tbody id="admin-catalog-table-body" class="divide-y divide-slate-100 bg-white">
+                                <!-- Populated dynamically -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ADMIN TAB 4: RETAIL SHOPS MASTER -->
+            <div id="adm-screen-shops" class="hidden space-y-4">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <h2 class="text-lg font-bold text-slate-900">Registered Retail Shops</h2>
+                        <p class="text-xs text-slate-500">Directory of retail partners visited by the 20 field agents</p>
+                    </div>
+                    <button onclick="openNewShopModal()" class="px-3.5 py-2 bg-blue-600 text-white rounded-xl text-xs font-bold flex items-center space-x-1.5 shadow-sm">
+                        <i data-lucide="plus-circle" class="w-4 h-4"></i>
+                        <span>Register Shop</span>
+                    </button>
+                </div>
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4" id="admin-shops-grid">
+                    <!-- Populated dynamically -->
+                </div>
+            </div>
+
+            <!-- ADMIN TAB 5: EMPLOYEES DIRECTORY -->
+            <div id="adm-screen-employees" class="hidden space-y-4">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <h2 class="text-lg font-bold text-slate-900">Field Sales Roster (20 Employees)</h2>
+                        <p class="text-xs text-slate-500">Assigned territories and active route status</p>
+                    </div>
+                </div>
+                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4" id="admin-employees-grid">
+                    <!-- Populated dynamically -->
+                </div>
+            </div>
+
+        </div>
+    </main>
+
+    <!-- ========================================== -->
+    <!-- STICKY FLOATING CART BAR (FIELD APP)      -->
+    <!-- ========================================== -->
+    <div id="floating-cart-bar" class="hidden fixed bottom-0 left-0 right-0 z-40 bg-white/95 backdrop-blur-md border-t border-slate-200 shadow-2xl p-4 no-print">
+        <div class="max-w-4xl mx-auto flex items-center justify-between gap-4">
+            <div class="flex items-center space-x-3">
+                <div class="w-11 h-11 rounded-xl bg-blue-600 text-white flex items-center justify-center shadow-md shadow-blue-500/30">
+                    <i data-lucide="shopping-cart" class="w-5 h-5"></i>
+                </div>
+                <div>
+                    <div class="flex items-center space-x-2">
+                        <span id="cart-item-count" class="font-extrabold text-slate-900 text-sm sm:text-base">0 Items</span>
+                        <span class="text-slate-300">•</span>
+                        <span id="cart-subtotal-amount" class="font-extrabold text-blue-600 text-sm sm:text-base">₹ 0.00</span>
+                    </div>
+                    <p id="cart-shop-preview" class="text-xs text-slate-500 truncate max-w-[200px] sm:max-w-xs">No shop selected</p>
+                </div>
+            </div>
+            <button onclick="openCartDrawer()" class="px-5 py-2.5 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-bold text-xs sm:text-sm rounded-xl shadow-lg shadow-blue-500/25 flex items-center space-x-2 transition transform active:scale-95">
+                <span>Review & Place Order</span>
+                <i data-lucide="arrow-right" class="w-4 h-4"></i>
+            </button>
+        </div>
+    </div>
+
+    <!-- ========================================== -->
+    <!-- CART & CHECKOUT SLIDE-OVER DRAWER          -->
+    <!-- ========================================== -->
+    <div id="cart-drawer-modal" class="hidden fixed inset-0 z-50 overflow-hidden no-print">
+        <div class="absolute inset-0 modal-backdrop transition-opacity" onclick="closeCartDrawer()"></div>
+        <div class="fixed inset-y-0 right-0 max-w-full flex pl-10">
+            <div class="w-screen max-w-md bg-white shadow-2xl flex flex-col">
+                <!-- Header -->
+                <div class="p-5 border-b border-slate-100 flex items-center justify-between bg-slate-50">
+                    <div class="flex items-center space-x-2.5">
+                        <div class="w-8 h-8 rounded-lg bg-blue-600 text-white flex items-center justify-center">
+                            <i data-lucide="shopping-bag" class="w-4 h-4"></i>
+                        </div>
+                        <div>
+                            <h3 class="font-bold text-slate-900 text-sm">Order Review</h3>
+                            <p id="drawer-shop-title" class="text-xs text-slate-500">Shop: Not selected</p>
+                        </div>
+                    </div>
+                    <button onclick="closeCartDrawer()" class="p-1.5 rounded-lg hover:bg-slate-200 text-slate-500 transition">
+                        <i data-lucide="x" class="w-5 h-5"></i>
+                    </button>
+                </div>
+
+                <!-- Items List -->
+                <div class="flex-1 overflow-y-auto p-5 space-y-4" id="cart-items-container">
+                    <!-- Populated dynamically -->
+                </div>
+
+                <!-- Checkout Controls & Summary Footer -->
+                <div class="p-5 bg-slate-50 border-t border-slate-200 space-y-4">
+                    <!-- Payment Terms Selector -->
+                    <div>
+                        <label class="block text-xs font-bold text-slate-600 mb-1.5">Payment Terms</label>
+                        <select id="order-payment-method" class="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-semibold text-slate-800 focus:ring-2 focus:ring-blue-500 focus:outline-none">
+                            <option value="Cash on Delivery">Cash on Delivery (COD)</option>
+                            <option value="7 Days Credit">7 Days Credit (Verified Retailer)</option>
+                            <option value="UPI / Instant Pay">UPI / Instant Digital Payment</option>
+                        </select>
+                    </div>
+
+                    <!-- Notes -->
+                    <div>
+                        <label class="block text-xs font-bold text-slate-600 mb-1.5">Order Notes & Delivery Instructions</label>
+                        <input type="text" id="order-notes-input" placeholder="e.g. Deliver before 12 PM, gate side shop" 
+                            class="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs focus:ring-2 focus:ring-blue-500 focus:outline-none">
+                    </div>
+
+                    <!-- Calculations Breakdown -->
+                    <div class="bg-white p-3.5 rounded-xl border border-slate-200 space-y-2 text-xs">
+                        <div class="flex justify-between text-slate-600">
+                            <span>Subtotal Items:</span>
+                            <span id="drawer-subtotal" class="font-semibold">₹ 0.00</span>
+                        </div>
+                        <div class="flex justify-between text-slate-600">
+                            <span>GST / Distribution Tax (5%):</span>
+                            <span id="drawer-tax" class="font-semibold">₹ 0.00</span>
+                        </div>
+                        <div class="border-t border-slate-100 pt-2 flex justify-between text-sm font-extrabold text-slate-900">
+                            <span>Grand Total:</span>
+                            <span id="drawer-grand-total" class="text-blue-600">₹ 0.00</span>
+                        </div>
+                    </div>
+
+                    <!-- Submit Button -->
+                    <button onclick="submitOrder()" id="btn-submit-order" class="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white font-bold text-sm rounded-xl shadow-lg shadow-blue-600/30 flex items-center justify-center space-x-2 transition">
+                        <i data-lucide="check-circle" class="w-4 h-4"></i>
+                        <span>Confirm & Place Order</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ========================================== -->
+    <!-- MODAL: ONBOARD NEW RETAIL SHOP             -->
+    <!-- ========================================== -->
+    <div id="new-shop-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 no-print">
+        <div class="absolute inset-0 modal-backdrop" onclick="closeNewShopModal()"></div>
+        <div class="relative bg-white rounded-2xl shadow-2xl max-w-lg w-full p-6 space-y-4">
+            <div class="flex items-center justify-between border-b border-slate-100 pb-3">
+                <div class="flex items-center space-x-2">
+                    <div class="w-8 h-8 rounded-lg bg-emerald-600 text-white flex items-center justify-center">
+                        <i data-lucide="store" class="w-4 h-4"></i>
+                    </div>
+                    <h3 class="font-bold text-slate-900 text-base">Register New Retail Shop</h3>
+                </div>
+                <button onclick="closeNewShopModal()" class="text-slate-400 hover:text-slate-600"><i data-lucide="x" class="w-5 h-5"></i></button>
+            </div>
+
+            <form id="new-shop-form" onsubmit="handleCreateShop(event)" class="space-y-3.5 text-xs">
+                <div>
+                    <label class="block font-bold text-slate-700 mb-1">Shop / Store Name *</label>
+                    <input type="text" id="new-shop-name" required placeholder="e.g. Mahavir Daily Needs" 
+                        class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:outline-none">
+                </div>
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block font-bold text-slate-700 mb-1">Owner / Contact Person *</label>
+                        <input type="text" id="new-shop-owner" required placeholder="e.g. Vikas Jain" 
+                            class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:outline-none">
+                    </div>
+                    <div>
+                        <label class="block font-bold text-slate-700 mb-1">Phone Number *</label>
+                        <input type="tel" id="new-shop-phone" required placeholder="e.g. +91 98765 00000" 
+                            class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:outline-none">
+                    </div>
+                </div>
+                <div>
+                    <label class="block font-bold text-slate-700 mb-1">Full Shop Address *</label>
+                    <input type="text" id="new-shop-address" required placeholder="e.g. Shop 4B, Sector 7 Market" 
+                        class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:outline-none">
+                </div>
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block font-bold text-slate-700 mb-1">Market Territory / Area</label>
+                        <input type="text" id="new-shop-territory" placeholder="e.g. Central Market" 
+                            class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:outline-none">
+                    </div>
+                    <div>
+                        <label class="block font-bold text-slate-700 mb-1">GSTIN (Optional)</label>
+                        <input type="text" id="new-shop-gst" placeholder="e.g. 07AAAAA0000A1Z5" 
+                            class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:outline-none">
+                    </div>
+                </div>
+                <div class="pt-3 flex justify-end space-x-2">
+                    <button type="button" onclick="closeNewShopModal()" class="px-4 py-2 bg-slate-100 text-slate-700 rounded-xl font-bold hover:bg-slate-200">Cancel</button>
+                    <button type="submit" class="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold shadow-md shadow-emerald-600/20">Save & Select Shop</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- ========================================== -->
+    <!-- MODAL: ORDER CONFIRMATION POPUP           -->
+    <!-- ========================================== -->
+    <div id="order-success-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 no-print">
+        <div class="absolute inset-0 modal-backdrop" onclick="closeSuccessModal()"></div>
+        <div class="relative bg-white rounded-2xl shadow-2xl max-w-sm w-full p-6 text-center space-y-4 animate-in zoom-in-95">
+            <div class="w-16 h-16 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center mx-auto">
+                <i data-lucide="check" class="w-8 h-8"></i>
+            </div>
+            <div>
+                <h3 class="text-lg font-extrabold text-slate-900">Order Placed Successfully!</h3>
+                <p class="text-xs text-slate-500 mt-1">Dispatched to Admin fulfillment portal</p>
+            </div>
+            <div class="bg-slate-50 p-3 rounded-xl border border-slate-200 text-xs text-left space-y-1.5">
+                <div class="flex justify-between">
+                    <span class="text-slate-500">Order No:</span>
+                    <span id="success-order-no" class="font-bold text-slate-800">ORD-1234</span>
+                </div>
+                <div class="flex justify-between">
+                    <span class="text-slate-500">Shop:</span>
+                    <span id="success-shop-name" class="font-semibold text-slate-800">Gupta Kirana</span>
+                </div>
+                <div class="flex justify-between">
+                    <span class="text-slate-500">Grand Total:</span>
+                    <span id="success-grand-total" class="font-bold text-blue-600">₹ 2,450.00</span>
+                </div>
+            </div>
+            <div class="space-y-2">
+                <button onclick="closeSuccessModal()" class="w-full py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs rounded-xl shadow-md transition">
+                    Place Another Order
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ========================================== -->
+    <!-- MODAL & PRINT VIEW: BILL & INVOICE PRINT   -->
+    <!-- ========================================== -->
+    <div id="invoice-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-6 overflow-y-auto">
+        <div class="fixed inset-0 modal-backdrop no-print" onclick="closeInvoiceModal()"></div>
+        
+        <div class="relative bg-white rounded-2xl shadow-2xl max-w-3xl w-full max-h-[92vh] flex flex-col z-10">
+            <!-- Modal Action Bar (Hidden in Print) -->
+            <div class="p-4 border-b border-slate-200 flex items-center justify-between bg-slate-50 rounded-t-2xl no-print">
+                <div class="flex items-center space-x-2">
+                    <div class="w-8 h-8 rounded-lg bg-blue-600 text-white flex items-center justify-center">
+                        <i data-lucide="printer" class="w-4 h-4"></i>
+                    </div>
+                    <div>
+                        <h3 class="font-bold text-slate-900 text-sm">Order Bill / Invoice</h3>
+                        <p class="text-[11px] text-slate-500">Ready for A4 Print or 80mm POS Slip</p>
+                    </div>
+                </div>
+                <div class="flex items-center space-x-2">
+                    <div class="flex items-center bg-slate-200 p-0.5 rounded-lg text-xs font-semibold mr-2">
+                        <button id="fmt-a4-btn" onclick="setInvoiceFormat('a4')" class="px-2.5 py-1 rounded-md bg-white text-blue-700 shadow-xs">Standard A4</button>
+                        <button id="fmt-thermal-btn" onclick="setInvoiceFormat('thermal')" class="px-2.5 py-1 rounded-md text-slate-600 hover:text-slate-900">80mm POS Slip</button>
+                    </div>
+                    <button onclick="window.print()" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs rounded-xl flex items-center space-x-1.5 shadow-md transition">
+                        <i data-lucide="printer" class="w-4 h-4"></i>
+                        <span>Print Bill</span>
+                    </button>
+                    <button onclick="closeInvoiceModal()" class="p-2 text-slate-400 hover:text-slate-600 rounded-lg">
+                        <i data-lucide="x" class="w-5 h-5"></i>
+                    </button>
+                </div>
+            </div>
+
+            <!-- PRINTABLE CONTENT CONTAINER -->
+            <div class="flex-1 overflow-y-auto p-6" id="invoice-print-area">
+                <!-- Dynamically Rendered by renderInvoiceTemplate() -->
+            </div>
+        </div>
+    </div>
+
+    <!-- ========================================== -->
+    <!-- MODAL: PASSWORD AUTHENTICATION DIALOG      -->
+    <!-- ========================================== -->
+    <div id="auth-password-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 no-print">
+        <div class="absolute inset-0 modal-backdrop" onclick="closeAuthModal()"></div>
+        <div class="relative bg-white rounded-2xl shadow-2xl max-w-sm w-full p-6 space-y-4 animate-in zoom-in-95">
+            <div class="flex items-center justify-between border-b border-slate-100 pb-3">
+                <div class="flex items-center space-x-2">
+                    <div id="auth-modal-avatar" class="w-8 h-8 rounded-lg bg-blue-600 text-white flex items-center justify-center font-bold text-xs">
+                        AD
+                    </div>
+                    <div>
+                        <h3 id="auth-modal-title" class="font-bold text-slate-900 text-sm">Account Authentication</h3>
+                        <p id="auth-modal-subtitle" class="text-[11px] text-slate-500">Password required to switch</p>
+                    </div>
+                </div>
+                <button onclick="closeAuthModal()" class="text-slate-400 hover:text-slate-600"><i data-lucide="x" class="w-5 h-5"></i></button>
+            </div>
+
+            <form id="auth-password-form" onsubmit="handleAuthSubmit(event)" class="space-y-4 text-xs">
+                <div class="bg-slate-50 p-3 rounded-xl border border-slate-200 flex items-center justify-between">
+                    <div>
+                        <div class="text-[10px] text-slate-400 uppercase font-semibold">Account Selected</div>
+                        <div id="auth-modal-user-name" class="font-bold text-slate-800 text-xs">Operations Admin</div>
+                        <div id="auth-modal-user-code" class="font-mono text-[10px] text-blue-600 font-bold">ADM001</div>
+                    </div>
+                    <span id="auth-modal-role-badge" class="px-2 py-0.5 rounded text-[10px] font-bold bg-slate-900 text-white">ADMIN</span>
+                </div>
+
+                <div>
+                    <label class="block font-bold text-slate-700 mb-1.5">Password / PIN *</label>
+                    <div class="relative">
+                        <input type="password" id="auth-modal-password" required placeholder="Enter PIN..." 
+                            class="w-full pl-3.5 pr-10 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:outline-none text-xs font-semibold">
+                        <button type="button" onclick="toggleAuthPasswordVisibility()" class="absolute right-3 top-2.5 text-slate-400 hover:text-slate-600">
+                            <i data-lucide="eye" class="w-4 h-4" id="auth-pwd-eye-icon"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <div id="auth-error-msg" class="hidden text-rose-600 font-semibold text-[11px] bg-rose-50 p-2.5 rounded-xl border border-rose-200">
+                    Invalid password. Please try again.
+                </div>
+
+                <div class="flex items-center space-x-2 pt-1">
+                    <button type="button" onclick="closeAuthModal()" class="flex-1 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-bold transition">
+                        Cancel
+                    </button>
+                    <button type="submit" id="btn-auth-submit" class="flex-1 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold shadow-md shadow-blue-600/20 transition flex items-center justify-center space-x-1.5">
+                        <i data-lucide="lock" class="w-3.5 h-3.5"></i>
+                        <span>Unlock & Login</span>
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- TOAST NOTIFICATION CONTAINER -->
+    <div id="toast-container" class="fixed top-20 right-4 z-50 space-y-2 pointer-events-none no-print"></div>
+
+    <script src="/app.js"></script>
+</body>
+</html>

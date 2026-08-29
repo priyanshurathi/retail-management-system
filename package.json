@@ -1,0 +1,13 @@
+{
+  "name": "retail-order-system",
+  "version": "1.0.0",
+  "description": "B2B Retail Field Sales & Admin Order Management System",
+  "main": "api/index.js",
+  "scripts": {
+    "start": "node api/index.js"
+  },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "express": "^4.19.2"
+  }
+}
