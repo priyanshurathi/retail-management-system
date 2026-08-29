@@ -271,7 +271,7 @@ app.patch('/api/products/:id/stock', (req, res) => {
 
 // Admin only: Add a new product to the catalog
 app.post('/api/products', (req, res) => {
-  const { requesterId, name, category, sku, unit, price, stockQuantity, minOrderQuantity, imageUrl, description } = req.body;
+  const { requesterId, name, category, sku, unit, price, stockQuantity, minOrderQuantity, imageUrl, description, hsn } = req.body;
 
   // Authorization: only administrators may add products
   const requester = db.users.find(u => u.id === parseInt(requesterId));
@@ -301,6 +301,7 @@ app.post('/api/products', (req, res) => {
     sku: (sku && sku.trim()) || `SKU-${String(nextId).padStart(3, '0')}`,
     name: name.trim(),
     category: category.trim(),
+    hsn: (hsn && hsn.trim()) || '',
     unit: unit.trim(),
     price: priceNum,
     stockQuantity: stockNum,
@@ -403,21 +404,92 @@ app.patch('/api/orders/:id/status', (req, res) => {
   res.json(order);
 });
 
+// Seller (left-half) details — fixed per the Vardaan Enterprises tax invoice
+const SELLER = {
+  name: 'VARDAAN ENTERPRISES',
+  addressLines: [
+    'B-37-A, PLOT NO. 17, KH NO. 31/9, 1ST FLOOR GALI NO 1 HARDEV',
+    'JHARODA MAJRA'
+  ],
+  gstin: '07AUDPM4075G1ZM',
+  telEmail: '9911114878'
+};
+
+// Default HSN/SAC codes per category so the invoice column is populated
+const HSN_DEFAULTS = {
+  'Company 1': '21069099',
+  'Company 2': '22029990',
+  'Company 3': '11010000',
+  'Company 4': '19053100',
+  'Company 5': '34013000'
+};
+
+// State code -> name for "Place of Supply" (derived from GSTIN prefix)
+const GST_STATE_NAMES = {
+  '07': 'Delhi', '27': 'Maharashtra', '09': 'Uttar Pradesh', '06': 'Haryana',
+  '29': 'Karnataka', '33': 'Tamil Nadu', '19': 'West Bengal', '24': 'Gujarat',
+  '08': 'Rajasthan', '36': 'Telangana', '32': 'Kerala', '23': 'Madhya Pradesh'
+};
+
+function financialYearLabel(dateObj) {
+  const y = dateObj.getFullYear();
+  const startYear = dateObj.getMonth() >= 3 ? y : y - 1; // FY starts April
+  return `${String(startYear).slice(-2)}-${String(startYear + 1).slice(-2)}`;
+}
+
 app.get('/api/orders/:id/invoice', (req, res) => {
   const order = db.orders.find(o => o.id === parseInt(req.params.id));
   if (!order) return res.status(404).json({ error: 'Order not found' });
 
   const dateObj = new Date(order.createdAt);
+
+  // Build per-line items with HSN, unit, and split CGST/SGST (2.5% each)
+  const lineItems = order.items.map((it, idx) => {
+    const prod = db.products.find(p => p.id === it.productId);
+    const hsn = it.hsn || (prod && prod.hsn) || HSN_DEFAULTS[prod && prod.category] || '';
+    const unit = it.unit || (prod && prod.unit) || '';
+    const base = it.subtotal; // GST-exclusive line value
+    const cgstAmt = Number((base * 0.025).toFixed(2));
+    const sgstAmt = Number((base * 0.025).toFixed(2));
+    const amount = Number((base + cgstAmt + sgstAmt).toFixed(2));
+    return {
+      sn: idx + 1,
+      productName: it.productName,
+      hsn,
+      quantity: it.quantity,
+      unit,
+      listPrice: it.unitPrice,
+      cgstPct: 2.5,
+      cgstAmt,
+      sgstPct: 2.5,
+      sgstAmt,
+      amount
+    };
+  });
+
+  const rawTotal = lineItems.reduce((s, l) => s + l.amount, 0);
+  const grandTotalRounded = Math.round(rawTotal);
+  const roundOff = Number((grandTotalRounded - rawTotal).toFixed(2));
+  const totalCgst = lineItems.reduce((s, l) => s + l.cgstAmt, 0);
+  const totalSgst = lineItems.reduce((s, l) => s + l.sgstAmt, 0);
+
+  const shopGst = (order.shop && order.shop.gstNumber) || '';
+  const stateCode = shopGst.slice(0, 2) || SELLER.gstin.slice(0, 2);
+  const placeOfSupply = `${GST_STATE_NAMES[stateCode] || 'Delhi'} (${stateCode})`;
+
   res.json({
     order,
-    companyName: 'Apex Retail Distributors Ltd.',
-    companyAddress: 'Plot 42, Metro Logistics Hub, Sector 18, Commercial Zone',
-    companyPhone: '+91 98765 43210 / +91 11 2345 6789',
-    companyEmail: 'orders@apexretaildist.com',
-    companyGst: '27AABCA1234F1Z8',
-    invoiceNumber: `INV-${order.orderNumber.replace('ORD-', '')}`,
-    invoiceDate: dateObj.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }),
-    printedAt: new Date().toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })
+    seller: SELLER,
+    lineItems,
+    subtotal: order.subtotal,
+    totalCgst: Number(totalCgst.toFixed(2)),
+    totalSgst: Number(totalSgst.toFixed(2)),
+    roundOff,
+    grandTotalRounded,
+    placeOfSupply,
+    invoiceNumber: `VE/${order.id}/${financialYearLabel(dateObj)}`,
+    invoiceDate: dateObj.toLocaleString('en-IN', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit', hour12: true }),
+    printedAt: new Date().toLocaleString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })
   });
 });
 

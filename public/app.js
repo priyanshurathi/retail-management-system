@@ -20,8 +20,7 @@ const state = {
     adminOrders: [],
     agentOrders: [],
     dashboardStats: null,
-    activeInvoiceData: null,
-    invoiceFormat: 'a4' // 'a4' | 'thermal'
+    activeInvoiceData: null
 };
 
 // Initialize Application
@@ -1230,6 +1229,7 @@ async function handleAddProduct(e) {
         name: document.getElementById('new-prod-name').value,
         category: document.getElementById('new-prod-category').value,
         sku: document.getElementById('new-prod-sku').value,
+        hsn: document.getElementById('new-prod-hsn').value,
         unit: document.getElementById('new-prod-unit').value,
         price: document.getElementById('new-prod-price').value,
         stockQuantity: document.getElementById('new-prod-stock').value,
@@ -1397,196 +1397,116 @@ function closeInvoiceModal() {
     document.getElementById('invoice-modal').classList.add('hidden');
 }
 
-function setInvoiceFormat(fmt) {
-    state.invoiceFormat = fmt;
-    const a4Btn = document.getElementById('fmt-a4-btn');
-    const thermalBtn = document.getElementById('fmt-thermal-btn');
-
-    if (fmt === 'a4') {
-        a4Btn.className = 'px-2.5 py-1 rounded-md bg-white text-blue-700 shadow-xs font-bold';
-        thermalBtn.className = 'px-2.5 py-1 rounded-md text-slate-600 hover:text-slate-900';
-    } else {
-        thermalBtn.className = 'px-2.5 py-1 rounded-md bg-white text-blue-700 shadow-xs font-bold';
-        a4Btn.className = 'px-2.5 py-1 rounded-md text-slate-600 hover:text-slate-900';
-    }
-    renderInvoiceTemplate();
-}
-
 function renderInvoiceTemplate() {
     const area = document.getElementById('invoice-print-area');
     if (!area || !state.activeInvoiceData) return;
 
     const data = state.activeInvoiceData;
     const ord = data.order;
+    const seller = data.seller || {};
+    const lines = data.lineItems || [];
 
-    if (state.invoiceFormat === 'thermal') {
-        // Compact 80mm Thermal POS Receipt Layout
-        let itemsHtml = '';
-        ord.items.forEach((it, i) => {
-            itemsHtml += `
-                <div style="display: flex; justify-content: space-between; margin-bottom: 4px;">
-                    <div>${i+1}. ${it.productName}<br><span style="color:#64748b;">${it.quantity} x ₹${it.unitPrice.toFixed(2)}</span></div>
-                    <div style="font-weight: bold;">₹${it.subtotal.toFixed(2)}</div>
+    const rowsHtml = lines.map(l => `
+        <tr>
+            <td class="inv-cell text-center">${l.sn}</td>
+            <td class="inv-cell">${l.productName}</td>
+            <td class="inv-cell text-center font-mono">${l.hsn || '—'}</td>
+            <td class="inv-cell text-center font-mono">${Number(l.quantity).toFixed(2)}</td>
+            <td class="inv-cell text-center">${l.unit || '—'}</td>
+            <td class="inv-cell text-right font-mono">${l.listPrice.toFixed(2)}</td>
+            <td class="inv-cell text-center">${l.cgstPct.toFixed(2)} %</td>
+            <td class="inv-cell text-right font-mono">${l.cgstAmt.toFixed(2)}</td>
+            <td class="inv-cell text-center">${l.sgstPct.toFixed(2)} %</td>
+            <td class="inv-cell text-right font-mono">${l.sgstAmt.toFixed(2)}</td>
+            <td class="inv-cell text-right font-mono font-bold">${l.amount.toFixed(2)}</td>
+        </tr>
+    `).join('');
+
+    const sellerAddress = (seller.addressLines || []).map(a => `<div>${a}</div>`).join('');
+
+    area.innerHTML = `
+        <div class="tax-invoice mx-auto bg-white text-slate-900" style="max-width: 1000px;">
+            <!-- Title bar -->
+            <div class="flex justify-between items-start px-1 pb-1">
+                <div class="text-sm font-bold">GSTIN : ${seller.gstin || ''}</div>
+                <div class="text-center flex-1">
+                    <div class="text-lg font-extrabold tracking-wide">TAX INVOICE</div>
                 </div>
-            `;
-        });
+                <div class="text-xs italic w-40 text-right">Original Copy</div>
+            </div>
 
-        area.innerHTML = `
-            <div class="thermal-receipt">
-                <div style="text-align: center; border-bottom: 1px dashed #94a3b8; padding-bottom: 8px; margin-bottom: 8px;">
-                    <div style="font-size: 16px; font-weight: 800;">${data.companyName}</div>
-                    <div style="font-size: 10px; color: #475569;">${data.companyAddress}</div>
-                    <div style="font-size: 10px;">GSTIN: ${data.companyGst}</div>
-                    <div style="font-size: 10px;">Ph: ${data.companyPhone}</div>
+            <!-- Seller (left) + Bill To (right) -->
+            <div class="grid grid-cols-2 border border-slate-800">
+                <div class="p-3 border-r border-slate-800">
+                    <div class="text-base font-extrabold uppercase">${seller.name || ''}</div>
+                    <div class="text-[11px] leading-snug mt-0.5">${sellerAddress}</div>
+                    <div class="text-[11px] mt-1">Tel./Email : ${seller.telEmail || ''}</div>
                 </div>
-
-                <div style="font-size: 11px; margin-bottom: 8px; border-bottom: 1px dashed #94a3b8; padding-bottom: 8px;">
-                    <div><strong>RECEIPT #:</strong> ${data.invoiceNumber}</div>
-                    <div><strong>DATE:</strong> ${data.invoiceDate}</div>
-                    <div><strong>SHOP:</strong> ${ord.shop.name}</div>
-                    <div><strong>OWNER:</strong> ${ord.shop.ownerName} (${ord.shop.phone})</div>
-                    <div><strong>SALES REP:</strong> ${ord.employee.fullName} (${ord.employee.employeeCode})</div>
-                    <div><strong>PAYMENT:</strong> ${ord.paymentMethod}</div>
-                </div>
-
-                <div style="border-bottom: 1px dashed #94a3b8; padding-bottom: 8px; margin-bottom: 8px;">
-                    ${itemsHtml}
-                </div>
-
-                <div style="font-size: 11px; margin-bottom: 8px; border-bottom: 1px dashed #94a3b8; padding-bottom: 8px;">
-                    <div style="display: flex; justify-content: space-between;">
-                        <span>SUBTOTAL:</span>
-                        <span>₹${ord.subtotal.toFixed(2)}</span>
-                    </div>
-                    <div style="display: flex; justify-content: space-between;">
-                        <span>GST (5%):</span>
-                        <span>₹${ord.taxAmount.toFixed(2)}</span>
-                    </div>
-                    <div style="display: flex; justify-content: space-between; font-size: 14px; font-weight: 900; margin-top: 4px;">
-                        <span>GRAND TOTAL:</span>
-                        <span>₹${ord.grandTotal.toFixed(2)}</span>
-                    </div>
-                </div>
-
-                <div style="text-align: center; font-size: 10px; color: #64748b; margin-top: 8px;">
-                    <div>* THANK YOU FOR YOUR BUSINESS *</div>
-                    <div>Goods once sold subject to delivery terms.</div>
+                <div class="p-3 text-[11px]">
+                    <div><span class="font-bold">Billed to :</span> <span class="font-bold">${ord.shop.name}</span></div>
+                    <div class="mt-0.5"><span class="font-bold">Address :</span> ${ord.shop.address}</div>
+                    ${ord.shop.gstNumber ? `<div class="mt-0.5"><span class="font-bold">GSTIN :</span> ${ord.shop.gstNumber}</div>` : `<div class="mt-0.5"><span class="font-bold">GSTIN :</span> —</div>`}
+                    <div class="mt-0.5"><span class="font-bold">Mobile No :</span> ${ord.shop.phone || ''}</div>
                 </div>
             </div>
-        `;
-    } else {
-        // Standard A4 Professional Tax Invoice Layout
-        let rowsHtml = '';
-        ord.items.forEach((it, idx) => {
-            rowsHtml += `
-                <tr class="border-b border-slate-200">
-                    <td class="py-2.5 px-3 text-slate-500 font-mono text-center">${idx + 1}</td>
-                    <td class="py-2.5 px-3 font-semibold text-slate-800">${it.productName}</td>
-                    <td class="py-2.5 px-3 text-slate-600 font-mono text-center">${it.quantity}</td>
-                    <td class="py-2.5 px-3 text-slate-700 text-right font-mono">₹ ${it.unitPrice.toFixed(2)}</td>
-                    <td class="py-2.5 px-3 text-slate-900 font-bold text-right font-mono">₹ ${it.subtotal.toFixed(2)}</td>
-                </tr>
-            `;
-        });
 
-        area.innerHTML = `
-            <div class="max-w-2xl mx-auto bg-white border border-slate-200 rounded-xl p-8 space-y-6 text-xs text-slate-800">
-                <!-- Header -->
-                <div class="flex justify-between items-start border-b border-slate-200 pb-6">
-                    <div>
-                        <div class="flex items-center space-x-2">
-                            <span class="w-8 h-8 rounded-lg bg-blue-600 text-white flex items-center justify-center font-black text-sm">A</span>
-                            <span class="text-xl font-extrabold text-slate-900 tracking-tight">${data.companyName}</span>
-                        </div>
-                        <p class="text-slate-500 mt-1 max-w-xs text-[11px]">${data.companyAddress}</p>
-                        <p class="text-[11px] text-slate-600 mt-0.5">GSTIN: <strong class="font-mono">${data.companyGst}</strong> | Ph: ${data.companyPhone}</p>
-                    </div>
-                    <div class="text-right">
-                        <span class="px-3 py-1 bg-blue-50 text-blue-700 rounded-full font-bold uppercase text-[11px] tracking-wider">Tax Invoice</span>
-                        <div class="mt-2">
-                            <div class="text-slate-400 uppercase text-[10px] font-bold">Invoice Number</div>
-                            <div class="font-mono font-bold text-sm text-slate-900">${data.invoiceNumber}</div>
-                        </div>
-                        <div class="mt-1 text-[11px] text-slate-500">Date: ${data.invoiceDate}</div>
-                    </div>
+            <!-- Invoice meta row -->
+            <div class="grid grid-cols-3 border-l border-r border-b border-slate-800 text-[11px]">
+                <div class="p-2 border-r border-slate-800"><span class="font-bold">Invoice No. :</span> ${data.invoiceNumber}</div>
+                <div class="p-2 border-r border-slate-800"><span class="font-bold">Dated :</span> ${data.invoiceDate}</div>
+                <div class="p-2"><span class="font-bold">Place of Supply :</span> ${data.placeOfSupply || ''}</div>
+            </div>
+
+            <!-- Line items table -->
+            <table class="w-full border-l border-r border-b border-slate-800 text-[11px] border-collapse">
+                <thead>
+                    <tr class="bg-slate-100 font-bold text-center">
+                        <th class="inv-cell w-8">S.N.</th>
+                        <th class="inv-cell text-left">Goods / Services supplied</th>
+                        <th class="inv-cell">HSN/SAC</th>
+                        <th class="inv-cell">Qty.</th>
+                        <th class="inv-cell">Unit</th>
+                        <th class="inv-cell">List Price</th>
+                        <th class="inv-cell">CGST (%)</th>
+                        <th class="inv-cell">CGST Amt.</th>
+                        <th class="inv-cell">SGST (%)</th>
+                        <th class="inv-cell">SGST Amt.</th>
+                        <th class="inv-cell">Amount(₹)</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${rowsHtml}
+                    <tr>
+                        <td class="inv-cell" colspan="6"></td>
+                        <td class="inv-cell text-center font-bold">2.50 %</td>
+                        <td class="inv-cell text-right font-mono font-bold">${data.totalCgst.toFixed(2)}</td>
+                        <td class="inv-cell text-center font-bold">2.50 %</td>
+                        <td class="inv-cell text-right font-mono font-bold">${data.totalSgst.toFixed(2)}</td>
+                        <td class="inv-cell"></td>
+                    </tr>
+                    <tr>
+                        <td class="inv-cell text-right font-semibold" colspan="10">Less : Rounded Off (-)</td>
+                        <td class="inv-cell text-right font-mono">${data.roundOff.toFixed(2)}</td>
+                    </tr>
+                    <tr class="bg-slate-100">
+                        <td class="inv-cell text-right font-extrabold" colspan="10">Grand Total ₹</td>
+                        <td class="inv-cell text-right font-mono font-extrabold">${data.grandTotalRounded.toFixed(2)}</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <!-- Signatures -->
+            <div class="grid grid-cols-2 border-l border-r border-b border-slate-800 text-[11px]">
+                <div class="p-6 border-r border-slate-800 flex items-end">
+                    <span class="italic">Receiver's Signature ______________________</span>
                 </div>
-
-                <!-- Bill To & Order Meta -->
-                <div class="grid grid-cols-2 gap-6 bg-slate-50 p-4 rounded-xl border border-slate-200">
-                    <div>
-                        <div class="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Bill To (Retail Partner)</div>
-                        <div class="font-bold text-sm text-slate-900">${ord.shop.name}</div>
-                        <div class="text-slate-600 mt-0.5">Prop: ${ord.shop.ownerName}</div>
-                        <div class="text-slate-600">Ph: ${ord.shop.phone}</div>
-                        <div class="text-slate-500 text-[11px] mt-0.5">${ord.shop.address}</div>
-                        ${ord.shop.gstNumber ? `<div class="text-[11px] text-slate-500 mt-0.5">GSTIN: ${ord.shop.gstNumber}</div>` : ''}
-                    </div>
-                    <div>
-                        <div class="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Dispatch & Booking Details</div>
-                        <div class="text-slate-700">Booked By: <strong>${ord.employee.fullName} (${ord.employee.employeeCode})</strong></div>
-                        <div class="text-slate-700">Territory: ${ord.employee.territory || ord.shop.territory}</div>
-                        <div class="text-slate-700">Payment Terms: <strong>${ord.paymentMethod}</strong></div>
-                        <div class="text-slate-700">Fulfillment Status: <strong class="uppercase text-blue-600">${ord.status}</strong></div>
-                        ${ord.notes ? `<div class="text-slate-500 italic mt-1">Note: "${ord.notes}"</div>` : ''}
-                    </div>
-                </div>
-
-                <!-- Line Items Table -->
-                <div class="rounded-xl border border-slate-200 overflow-hidden">
-                    <table class="w-full text-left text-xs border-collapse">
-                        <thead class="bg-slate-100/70 border-b border-slate-200 font-bold uppercase text-[10px] text-slate-600">
-                            <tr>
-                                <th class="py-2.5 px-3 text-center w-10">#</th>
-                                <th class="py-2.5 px-3">Item Description</th>
-                                <th class="py-2.5 px-3 text-center w-16">Qty</th>
-                                <th class="py-2.5 px-3 text-right w-24">Rate</th>
-                                <th class="py-2.5 px-3 text-right w-28">Amount</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            ${rowsHtml}
-                        </tbody>
-                    </table>
-                </div>
-
-                <!-- Totals & Tax Calculation -->
-                <div class="flex justify-end pt-2">
-                    <div class="w-72 space-y-1.5 text-xs">
-                        <div class="flex justify-between text-slate-600">
-                            <span>Subtotal:</span>
-                            <span class="font-mono font-semibold">₹ ${ord.subtotal.toFixed(2)}</span>
-                        </div>
-                        <div class="flex justify-between text-slate-600">
-                            <span>CGST (2.5%):</span>
-                            <span class="font-mono">₹ ${(ord.taxAmount / 2).toFixed(2)}</span>
-                        </div>
-                        <div class="flex justify-between text-slate-600">
-                            <span>SGST (2.5%):</span>
-                            <span class="font-mono">₹ ${(ord.taxAmount / 2).toFixed(2)}</span>
-                        </div>
-                        <div class="border-t-2 border-slate-900 pt-2 flex justify-between font-extrabold text-sm text-slate-900">
-                            <span>Grand Total:</span>
-                            <span class="font-mono text-blue-700">₹ ${ord.grandTotal.toFixed(2)}</span>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Signatures & Disclaimer Footer -->
-                <div class="pt-8 border-t border-slate-200 flex justify-between items-end text-[11px] text-slate-500">
-                    <div>
-                        <p class="font-semibold text-slate-700">Terms & Conditions:</p>
-                        <p>1. Payment due per agreed terms (${ord.paymentMethod}).</p>
-                        <p>2. Goods received in good condition & sealed packs.</p>
-                    </div>
-                    <div class="text-center">
-                        <div class="w-40 border-b border-slate-400 mb-1"></div>
-                        <p class="font-bold text-slate-700">Authorized Signatory</p>
-                        <p class="text-[10px] text-slate-400">${data.companyName}</p>
-                    </div>
+                <div class="p-3 text-right">
+                    <div class="font-bold">For ${seller.name || ''}</div>
+                    <div class="mt-8 italic">Authorised Signatory</div>
                 </div>
             </div>
-        `;
-    }
+        </div>
+    `;
 }
 
 // Helpers

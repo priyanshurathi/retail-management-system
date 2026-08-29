@@ -645,7 +645,12 @@
                             class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:outline-none">
                     </div>
                 </div>
-                <div class="grid grid-cols-2 gap-3">
+                <div class="grid grid-cols-3 gap-3">
+                    <div>
+                        <label class="block font-bold text-slate-700 mb-1">HSN / SAC (optional)</label>
+                        <input type="text" id="new-prod-hsn" placeholder="e.g. 21069099"
+                            class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:outline-none">
+                    </div>
                     <div>
                         <label class="block font-bold text-slate-700 mb-1">Packaging Unit *</label>
                         <input type="text" id="new-prod-unit" required placeholder="e.g. Box of 24 Packs"
@@ -736,18 +741,14 @@
                         <i data-lucide="printer" class="w-4 h-4"></i>
                     </div>
                     <div>
-                        <h3 class="font-bold text-slate-900 text-sm">Order Bill / Invoice</h3>
-                        <p class="text-[11px] text-slate-500">Ready for A4 Print or 80mm POS Slip</p>
+                        <h3 class="font-bold text-slate-900 text-sm">Tax Invoice</h3>
+                        <p class="text-[11px] text-slate-500">GST Tax Invoice — ready to print / save as PDF</p>
                     </div>
                 </div>
                 <div class="flex items-center space-x-2">
-                    <div class="flex items-center bg-slate-200 p-0.5 rounded-lg text-xs font-semibold mr-2">
-                        <button id="fmt-a4-btn" onclick="setInvoiceFormat('a4')" class="px-2.5 py-1 rounded-md bg-white text-blue-700 shadow-xs">Standard A4</button>
-                        <button id="fmt-thermal-btn" onclick="setInvoiceFormat('thermal')" class="px-2.5 py-1 rounded-md text-slate-600 hover:text-slate-900">80mm POS Slip</button>
-                    </div>
                     <button onclick="window.print()" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs rounded-xl flex items-center space-x-1.5 shadow-md transition">
                         <i data-lucide="printer" class="w-4 h-4"></i>
-                        <span>Print Bill</span>
+                        <span>Print / Save PDF</span>
                     </button>
                     <button onclick="closeInvoiceModal()" class="p-2 text-slate-400 hover:text-slate-600 rounded-lg">
                         <i data-lucide="x" class="w-5 h-5"></i>

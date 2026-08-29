@@ -94,8 +94,20 @@ body {
     transition: transform 0.3s ease-out;
 }
 
+/* Tax Invoice table cells */
+.tax-invoice .inv-cell {
+    border: 1px solid #1e293b;
+    padding: 4px 6px;
+    vertical-align: top;
+}
+.tax-invoice table { border-collapse: collapse; }
+
 /* Print Styles */
 @media print {
+    @page {
+        size: A4 landscape;
+        margin: 8mm;
+    }
     body * {
         visibility: hidden;
     }
@@ -114,19 +126,8 @@ body {
         box-shadow: none !important;
         border: none !important;
     }
+    .tax-invoice { max-width: 100% !important; }
     .no-print {
         display: none !important;
     }
-}
-
-/* Thermal POS receipt formatting */
-.thermal-receipt {
-    width: 320px;
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 12px;
-    line-height: 1.35;
-    padding: 16px;
-    background: #ffffff;
-    border: 1px dashed #cbd5e1;
-    margin: 0 auto;
 }
