@@ -323,11 +323,19 @@
                             </button>
                         </div>
 
-                        <!-- Search Box in Orders Table -->
-                        <div class="relative w-full sm:w-64">
-                            <i data-lucide="search" class="w-4 h-4 absolute left-3.5 top-2.5 text-slate-400"></i>
-                            <input type="text" id="admin-order-search" oninput="renderAdminOrdersTable()" placeholder="Search order, shop, agent..." 
-                                class="w-full pl-10 pr-4 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:ring-2 focus:ring-blue-500 focus:outline-none">
+                        <div class="flex items-center gap-2">
+                            <!-- Club-by-shop toggle -->
+                            <button onclick="toggleClubByShop()" id="club-toggle-btn" class="px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 transition whitespace-nowrap">
+                                <i data-lucide="layers" class="w-3.5 h-3.5"></i>
+                                <span>Club by Shop</span>
+                            </button>
+
+                            <!-- Search Box in Orders Table -->
+                            <div class="relative w-full sm:w-56">
+                                <i data-lucide="search" class="w-4 h-4 absolute left-3.5 top-2.5 text-slate-400"></i>
+                                <input type="text" id="admin-order-search" oninput="renderAdminOrdersTable()" placeholder="Search order, shop, agent..."
+                                    class="w-full pl-10 pr-4 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:ring-2 focus:ring-blue-500 focus:outline-none">
+                            </div>
                         </div>
                     </div>
 
@@ -689,6 +697,57 @@
                     <button type="submit" class="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold shadow-md shadow-blue-600/20">Save Product</button>
                 </div>
             </form>
+        </div>
+    </div>
+
+    <!-- ========================================== -->
+    <!-- MODAL: EDIT ORDER (Admin)                 -->
+    <!-- ========================================== -->
+    <div id="edit-order-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 no-print">
+        <div class="absolute inset-0 modal-backdrop" onclick="closeEditOrderModal()"></div>
+        <div class="relative bg-white rounded-2xl shadow-2xl max-w-2xl w-full p-6 space-y-4 max-h-[90vh] overflow-y-auto">
+            <div class="flex items-center justify-between border-b border-slate-100 pb-3">
+                <div class="flex items-center space-x-2">
+                    <div class="w-8 h-8 rounded-lg bg-blue-600 text-white flex items-center justify-center">
+                        <i data-lucide="pencil" class="w-4 h-4"></i>
+                    </div>
+                    <div>
+                        <h3 class="font-bold text-slate-900 text-base">Edit Order</h3>
+                        <p class="text-[11px] text-slate-500" id="edit-order-subtitle">—</p>
+                    </div>
+                </div>
+                <button onclick="closeEditOrderModal()" class="text-slate-400 hover:text-slate-600"><i data-lucide="x" class="w-5 h-5"></i></button>
+            </div>
+
+            <!-- Current items -->
+            <div>
+                <div class="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">Order Items</div>
+                <div id="edit-order-items" class="space-y-2"></div>
+            </div>
+
+            <!-- Add product row -->
+            <div class="bg-slate-50 border border-slate-200 rounded-xl p-3">
+                <div class="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">Add Product</div>
+                <div class="flex items-end gap-2">
+                    <div class="flex-1">
+                        <select id="edit-add-product" class="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs focus:ring-2 focus:ring-blue-500 focus:outline-none"></select>
+                    </div>
+                    <input type="number" id="edit-add-qty" min="1" value="1" class="w-16 px-2 py-2 bg-white border border-slate-200 rounded-xl text-xs text-center focus:ring-2 focus:ring-blue-500 focus:outline-none">
+                    <button onclick="editAddProduct()" class="px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold flex items-center gap-1 whitespace-nowrap">
+                        <i data-lucide="plus" class="w-3.5 h-3.5"></i><span>Add</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Totals -->
+            <div class="flex justify-end">
+                <div class="w-56 space-y-1 text-xs" id="edit-order-totals"></div>
+            </div>
+
+            <div class="pt-2 flex justify-end space-x-2 border-t border-slate-100">
+                <button type="button" onclick="closeEditOrderModal()" class="px-4 py-2 bg-slate-100 text-slate-700 rounded-xl font-bold hover:bg-slate-200 text-xs">Cancel</button>
+                <button type="button" onclick="saveOrderEdit()" id="edit-order-save-btn" class="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold shadow-md shadow-blue-600/20 text-xs">Save Changes</button>
+            </div>
         </div>
     </div>
 

@@ -10,6 +10,11 @@ const state = {
     fieldTab: 'catalog',     // 'catalog' | 'orders'
     adminTab: 'orders',      // 'orders' | 'analytics' | 'products' | 'shops' | 'employees'
     adminDateFilter: 'today', // 'today' | 'yesterday' | 'last7' | 'last30'
+    clubByShop: false,        // consolidate same-shop same-date orders into one group
+    expandedGroups: {},       // { [groupKey]: true } expanded clubbed groups
+    editingOrderId: null,     // order currently open in the edit modal
+    editItems: {},            // { [productId]: qty } working copy while editing
+    editOriginalQty: {},      // { [productId]: qty } quantities the order held before editing
     shops: [],
     selectedShopId: null,
     products: [],
@@ -942,6 +947,29 @@ function filterAdminByDate(range) {
     renderAdminOrdersTable();
 }
 
+function toggleClubByShop() {
+    state.clubByShop = !state.clubByShop;
+    const btn = document.getElementById('club-toggle-btn');
+    if (btn) {
+        btn.className = state.clubByShop
+            ? 'px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 border border-blue-600 bg-blue-600 text-white transition whitespace-nowrap'
+            : 'px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 transition whitespace-nowrap';
+    }
+    renderAdminOrdersTable();
+    refreshLucide();
+}
+
+function toggleGroup(key) {
+    state.expandedGroups[key] = !state.expandedGroups[key];
+    renderAdminOrdersTable();
+}
+
+// Calendar-day key (local) used to club orders from the same shop on the same date
+function dateKey(isoStr) {
+    const d = new Date(isoStr);
+    return `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
+}
+
 // Returns true if an ISO timestamp falls within the given date range key
 function isInDateRange(isoStr, range) {
     if (!isoStr) return false;
@@ -987,6 +1015,13 @@ function renderAdminOrdersTable() {
                 </td>
             </tr>
         `;
+        refreshLucide();
+        return;
+    }
+
+    // Clubbed view: consolidate same-shop same-date orders into one group
+    if (state.clubByShop) {
+        renderClubbedGroups(filtered, tbody);
         refreshLucide();
         return;
     }
@@ -1077,8 +1112,16 @@ function buildAdminOrderRow(ord) {
             <span class="px-2.5 py-1 rounded-full text-[10px] font-extrabold uppercase tracking-wide ${badgeClass}">${ord.status}</span>
         </td>
         <td class="py-3 px-4 text-right">
-            <div class="flex items-center justify-end space-x-2">
+            <div class="flex items-center justify-end space-x-1.5">
                 ${actionButtons}
+                ${ord.status !== 'DONE' ? `<button onclick="openEditOrderModal(${ord.id})" title="Edit Order"
+                    class="p-1.5 rounded-lg bg-blue-50 hover:bg-blue-100 text-blue-600 transition">
+                    <i data-lucide="pencil" class="w-3.5 h-3.5"></i>
+                </button>` : ''}
+                <button onclick="deleteOrder(${ord.id})" title="Delete Order"
+                    class="p-1.5 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-600 transition">
+                    <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
+                </button>
                 <button onclick="openInvoiceModal(${ord.id})" title="Print Bill / Invoice"
                     class="p-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 transition">
                     <i data-lucide="printer" class="w-3.5 h-3.5"></i>
@@ -1087,6 +1130,65 @@ function buildAdminOrderRow(ord) {
         </td>
     `;
     return tr;
+}
+
+// Clubbed rendering: one expandable header per shop + calendar date
+function renderClubbedGroups(filtered, tbody) {
+    const groups = {};
+    filtered.forEach(o => {
+        const key = `${o.shop.id}|${dateKey(o.createdAt)}`;
+        if (!groups[key]) groups[key] = { key, shop: o.shop, date: o.createdAt, orders: [] };
+        groups[key].orders.push(o);
+    });
+
+    const groupList = Object.values(groups).sort((a, b) => new Date(b.date) - new Date(a.date));
+
+    groupList.forEach(g => {
+        const orders = g.orders;
+        const combinedTotal = orders.reduce((s, o) => s + o.grandTotal, 0);
+        const totalLines = orders.reduce((s, o) => s + o.items.length, 0);
+        const statusSet = [...new Set(orders.map(o => o.status))];
+        const expanded = !!state.expandedGroups[g.key];
+        const ids = orders.map(o => o.id).join(',');
+        const isMulti = orders.length > 1;
+
+        const statusHtml = statusSet.length === 1
+            ? `<span class="px-2 py-0.5 rounded-full text-[10px] font-extrabold uppercase tracking-wide ${getStatusBadgeClass(statusSet[0])}">${statusSet[0]}</span>`
+            : statusSet.map(s => `<span class="px-1.5 py-0.5 rounded text-[9px] font-bold uppercase ${getStatusBadgeClass(s)}">${orders.filter(o => o.status === s).length} ${s}</span>`).join(' ');
+
+        const header = document.createElement('tr');
+        header.className = 'bg-blue-50/60 border-t-2 border-blue-100';
+        header.innerHTML = `
+            <td colspan="7" class="py-2.5 px-4">
+                <div class="flex items-center justify-between gap-3 flex-wrap">
+                    <button onclick="toggleGroup('${g.key}')" class="flex items-center gap-2 text-left">
+                        <i data-lucide="${expanded ? 'chevron-down' : 'chevron-right'}" class="w-4 h-4 text-blue-600"></i>
+                        <span class="p-1.5 rounded-lg bg-blue-100 text-blue-700"><i data-lucide="store" class="w-3.5 h-3.5"></i></span>
+                        <span>
+                            <span class="font-bold text-slate-900 text-sm">${g.shop.name}</span>
+                            <span class="text-[10px] text-slate-500 ml-1">${g.shop.ownerName} • ${formatDate(g.date)}</span>
+                            <span class="block text-[10px] text-slate-500">${orders.length} order${isMulti ? 's' : ''} • ${totalLines} line items</span>
+                        </span>
+                    </button>
+                    <div class="flex items-center gap-2">
+                        ${statusHtml}
+                        <span class="font-extrabold text-slate-900 text-sm">₹ ${combinedTotal.toFixed(2)}</span>
+                        <button onclick="openCombinedBill('${ids}')" class="px-2.5 py-1 bg-slate-800 hover:bg-slate-900 text-white rounded-lg text-[11px] font-bold flex items-center gap-1 transition">
+                            <i data-lucide="receipt" class="w-3 h-3"></i><span>${isMulti ? 'Combined Bill' : 'Bill'}</span>
+                        </button>
+                        <button onclick="deleteOrderGroup('${ids}', ${orders.length})" class="px-2 py-1 bg-rose-50 hover:bg-rose-100 text-rose-600 rounded-lg text-[11px] font-bold flex items-center gap-1 transition">
+                            <i data-lucide="trash-2" class="w-3 h-3"></i><span>Delete</span>
+                        </button>
+                    </div>
+                </div>
+            </td>
+        `;
+        tbody.appendChild(header);
+
+        if (expanded) {
+            orders.forEach(o => tbody.appendChild(buildAdminOrderRow(o)));
+        }
+    });
 }
 
 async function updateOrderStatus(orderId, newStatus) {
@@ -1113,6 +1215,270 @@ async function updateOrderStatus(orderId, newStatus) {
 async function refreshAdminData() {
     showToast('Syncing orders and revenue metrics...', 'info');
     await loadAdminData();
+}
+
+// ---- Order Editing (Admin) ----
+
+// Max quantity selectable for a product while editing an order:
+// current stock plus whatever this order already reserved for it.
+function editAvailable(productId) {
+    const prod = state.products.find(p => p.id === parseInt(productId));
+    const stock = prod ? (prod.stockQuantity ?? 0) : 0;
+    return stock + (state.editOriginalQty[productId] || 0);
+}
+
+function openEditOrderModal(orderId) {
+    if (!state.currentUser || state.currentUser.role !== 'ADMIN') {
+        showToast('Only administrators can edit orders', 'error');
+        return;
+    }
+    const order = state.adminOrders.find(o => o.id === orderId);
+    if (!order) return;
+    if (order.status === 'DONE') {
+        showToast('Completed orders cannot be edited', 'warning');
+        return;
+    }
+
+    state.editingOrderId = orderId;
+    state.editItems = {};
+    state.editOriginalQty = {};
+    order.items.forEach(it => {
+        state.editItems[it.productId] = (state.editItems[it.productId] || 0) + it.quantity;
+        state.editOriginalQty[it.productId] = (state.editOriginalQty[it.productId] || 0) + it.quantity;
+    });
+
+    document.getElementById('edit-order-subtitle').innerText = `${order.orderNumber} • ${order.shop.name}`;
+    populateEditAddProduct();
+    renderEditOrderItems();
+    document.getElementById('edit-order-modal').classList.remove('hidden');
+    refreshLucide();
+}
+
+function closeEditOrderModal() {
+    document.getElementById('edit-order-modal').classList.add('hidden');
+    state.editingOrderId = null;
+    state.editItems = {};
+    state.editOriginalQty = {};
+}
+
+function populateEditAddProduct() {
+    const select = document.getElementById('edit-add-product');
+    if (!select) return;
+    select.innerHTML = '';
+    state.products
+        .filter(p => p.active)
+        .forEach(p => {
+            const opt = document.createElement('option');
+            opt.value = p.id;
+            const avail = editAvailable(p.id) - (state.editItems[p.id] || 0);
+            opt.innerText = `${p.name} — ₹${p.price.toFixed(2)} (${avail} avail)`;
+            select.appendChild(opt);
+        });
+}
+
+function renderEditOrderItems() {
+    const container = document.getElementById('edit-order-items');
+    if (!container) return;
+    container.innerHTML = '';
+
+    const entries = Object.entries(state.editItems).filter(([, q]) => q > 0);
+    if (entries.length === 0) {
+        container.innerHTML = '<div class="text-xs text-slate-400 py-4 text-center">No items — add at least one product below.</div>';
+    }
+
+    entries.forEach(([pid, qty]) => {
+        const prod = state.products.find(p => p.id === parseInt(pid));
+        if (!prod) return;
+        const lineTotal = prod.price * qty;
+        const row = document.createElement('div');
+        row.className = 'flex items-center justify-between gap-2 p-2.5 bg-slate-50 rounded-xl border border-slate-200';
+        row.innerHTML = `
+            <div class="flex-1 min-w-0">
+                <div class="font-bold text-slate-800 text-xs truncate">${prod.imageUrl || ''} ${prod.name}</div>
+                <div class="text-[10px] text-slate-500">₹ ${prod.price.toFixed(2)} × ${qty} = <span class="font-bold text-blue-600">₹ ${lineTotal.toFixed(2)}</span></div>
+            </div>
+            <div class="flex items-center gap-1 bg-white p-1 rounded-lg border border-slate-200">
+                <button onclick="editChangeQty(${pid}, -1)" class="w-6 h-6 rounded bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs">-</button>
+                <input type="number" min="0" value="${qty}" onchange="editSetQty(${pid}, this.value)" class="w-10 text-center font-bold text-xs bg-transparent focus:outline-none">
+                <button onclick="editChangeQty(${pid}, 1)" class="w-6 h-6 rounded bg-blue-600 text-white font-bold text-xs">+</button>
+            </div>
+            <button onclick="editRemoveItem(${pid})" title="Remove" class="p-1.5 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-600">
+                <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
+            </button>
+        `;
+        container.appendChild(row);
+    });
+
+    renderEditOrderTotals();
+    populateEditAddProduct();
+    refreshLucide();
+}
+
+function renderEditOrderTotals() {
+    const el = document.getElementById('edit-order-totals');
+    if (!el) return;
+    let subtotal = 0;
+    Object.entries(state.editItems).forEach(([pid, qty]) => {
+        const prod = state.products.find(p => p.id === parseInt(pid));
+        if (prod && qty > 0) subtotal += prod.price * qty;
+    });
+    const tax = subtotal * 0.05;
+    const grand = subtotal + tax;
+    el.innerHTML = `
+        <div class="flex justify-between text-slate-600"><span>Subtotal</span><span class="font-mono">₹ ${subtotal.toFixed(2)}</span></div>
+        <div class="flex justify-between text-slate-600"><span>GST (5%)</span><span class="font-mono">₹ ${tax.toFixed(2)}</span></div>
+        <div class="flex justify-between font-extrabold text-slate-900 border-t border-slate-200 pt-1"><span>Grand Total</span><span class="font-mono text-blue-700">₹ ${grand.toFixed(2)}</span></div>
+    `;
+}
+
+function editChangeQty(productId, delta) {
+    const current = state.editItems[productId] || 0;
+    let next = Math.max(0, current + delta);
+    const max = editAvailable(productId);
+    if (next > max) {
+        next = max;
+        if (delta > 0) showToast(`Only ${max} unit(s) of this product available`, 'warning');
+    }
+    if (next === 0) delete state.editItems[productId];
+    else state.editItems[productId] = next;
+    renderEditOrderItems();
+}
+
+function editSetQty(productId, value) {
+    let qty = parseInt(value) || 0;
+    const max = editAvailable(productId);
+    if (qty > max) {
+        qty = max;
+        showToast(`Only ${max} unit(s) of this product available`, 'warning');
+    }
+    if (qty <= 0) delete state.editItems[productId];
+    else state.editItems[productId] = qty;
+    renderEditOrderItems();
+}
+
+function editRemoveItem(productId) {
+    delete state.editItems[productId];
+    renderEditOrderItems();
+}
+
+function editAddProduct() {
+    const select = document.getElementById('edit-add-product');
+    const qtyInput = document.getElementById('edit-add-qty');
+    if (!select || !select.value) return;
+    const pid = parseInt(select.value);
+    const addQty = Math.max(1, parseInt(qtyInput.value) || 1);
+    const desired = (state.editItems[pid] || 0) + addQty;
+    const max = editAvailable(pid);
+    if (desired > max) {
+        showToast(`Only ${max} unit(s) available`, 'warning');
+        state.editItems[pid] = max;
+    } else {
+        state.editItems[pid] = desired;
+    }
+    qtyInput.value = 1;
+    renderEditOrderItems();
+}
+
+async function saveOrderEdit() {
+    if (!state.editingOrderId) return;
+    const items = Object.entries(state.editItems)
+        .filter(([, q]) => q > 0)
+        .map(([productId, quantity]) => ({ productId: parseInt(productId), quantity }));
+    if (items.length === 0) {
+        showToast('An order must contain at least one item', 'warning');
+        return;
+    }
+
+    const btn = document.getElementById('edit-order-save-btn');
+    btn.disabled = true;
+    btn.innerText = 'Saving...';
+
+    try {
+        const res = await fetch(`/api/orders/${state.editingOrderId}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ requesterId: state.currentUser.id, items })
+        });
+        if (res.ok) {
+            const updated = await res.json();
+            closeEditOrderModal();
+            await loadProductsAndCategories(); // stock changed
+            await loadAdminData();             // orders + KPIs
+            showToast(`Order ${updated.orderNumber} updated`, 'success');
+        } else {
+            const err = await res.json().catch(() => ({}));
+            showToast(err.error || 'Failed to update order', 'error');
+        }
+    } catch (e) {
+        console.error(e);
+        showToast('Server error while updating order', 'error');
+    } finally {
+        btn.disabled = false;
+        btn.innerText = 'Save Changes';
+    }
+}
+
+async function deleteOrder(orderId) {
+    if (!state.currentUser || state.currentUser.role !== 'ADMIN') {
+        showToast('Only administrators can delete orders', 'error');
+        return;
+    }
+    const order = state.adminOrders.find(o => o.id === orderId);
+    if (!confirm(`Delete order ${order ? order.orderNumber : orderId}? Stock will be returned to inventory.`)) return;
+
+    try {
+        const res = await fetch(`/api/orders/${orderId}?requesterId=${state.currentUser.id}`, { method: 'DELETE' });
+        if (res.ok) {
+            await loadProductsAndCategories();
+            await loadAdminData();
+            showToast('Order deleted', 'success');
+        } else {
+            const err = await res.json().catch(() => ({}));
+            showToast(err.error || 'Failed to delete order', 'error');
+        }
+    } catch (e) {
+        console.error(e);
+        showToast('Server error while deleting order', 'error');
+    }
+}
+
+async function deleteOrderGroup(idsStr, count) {
+    if (!state.currentUser || state.currentUser.role !== 'ADMIN') {
+        showToast('Only administrators can delete orders', 'error');
+        return;
+    }
+    if (!confirm(`Delete all ${count} order(s) in this group? Stock will be returned to inventory.`)) return;
+
+    const ids = idsStr.split(',').map(s => parseInt(s)).filter(Boolean);
+    try {
+        for (const id of ids) {
+            await fetch(`/api/orders/${id}?requesterId=${state.currentUser.id}`, { method: 'DELETE' });
+        }
+        await loadProductsAndCategories();
+        await loadAdminData();
+        showToast(`${ids.length} order(s) deleted`, 'success');
+    } catch (e) {
+        console.error(e);
+        showToast('Server error while deleting orders', 'error');
+    }
+}
+
+async function openCombinedBill(idsStr) {
+    try {
+        const res = await fetch(`/api/orders/combined-invoice?ids=${idsStr}`);
+        if (res.ok) {
+            state.activeInvoiceData = await res.json();
+            renderInvoiceTemplate();
+            document.getElementById('invoice-modal').classList.remove('hidden');
+            refreshLucide();
+        } else {
+            const err = await res.json().catch(() => ({}));
+            showToast(err.error || 'Failed to build combined bill', 'error');
+        }
+    } catch (e) {
+        console.error(e);
+        showToast('Server error building combined bill', 'error');
+    }
 }
 
 // Master Data: Catalog, Shops, Employees
@@ -1456,6 +1822,10 @@ function renderInvoiceTemplate() {
                 <div class="p-2 border-r border-slate-800"><span class="font-bold">Dated :</span> ${data.invoiceDate}</div>
                 <div class="p-2"><span class="font-bold">Place of Supply :</span> ${data.placeOfSupply || ''}</div>
             </div>
+            ${data.sourceOrders && data.sourceOrders.length > 1 ? `
+            <div class="border-l border-r border-b border-slate-800 text-[11px] p-2 bg-slate-50">
+                <span class="font-bold">Combined bill for orders :</span> ${data.sourceOrders.join(', ')}
+            </div>` : ''}
 
             <!-- Line items table -->
             <table class="w-full border-l border-r border-b border-slate-800 text-[11px] border-collapse">

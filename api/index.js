@@ -404,6 +404,101 @@ app.patch('/api/orders/:id/status', (req, res) => {
   res.json(order);
 });
 
+// Admin only: Edit an order that is not yet completed (add/remove products,
+// change quantities). Inventory is adjusted to reflect the change.
+app.put('/api/orders/:id', (req, res) => {
+  const { requesterId, items, paymentMethod, notes } = req.body;
+
+  const requester = db.users.find(u => u.id === parseInt(requesterId));
+  if (!requester || requester.role !== 'ADMIN') {
+    return res.status(403).json({ error: 'Only administrators can edit orders' });
+  }
+
+  const order = db.orders.find(o => o.id === parseInt(req.params.id));
+  if (!order) return res.status(404).json({ error: 'Order not found' });
+  if (order.status === 'DONE') {
+    return res.status(400).json({ error: 'Completed orders cannot be edited' });
+  }
+  if (!Array.isArray(items)) {
+    return res.status(400).json({ error: 'Items array is required' });
+  }
+
+  // Quantities currently reserved by this order (to be released back to stock)
+  const oldQty = {};
+  order.items.forEach(it => { oldQty[it.productId] = (oldQty[it.productId] || 0) + it.quantity; });
+
+  // Desired quantities after the edit (merge duplicate product lines)
+  const newQty = {};
+  for (const it of items) {
+    const pid = parseInt(it.productId);
+    const q = parseInt(it.quantity);
+    if (!pid || !(q > 0)) continue;
+    newQty[pid] = (newQty[pid] || 0) + q;
+  }
+  if (Object.keys(newQty).length === 0) {
+    return res.status(400).json({ error: 'An order must contain at least one item' });
+  }
+
+  // Validate against available stock (current stock + what this order already holds)
+  for (const pid of Object.keys(newQty)) {
+    const prod = db.products.find(p => p.id === parseInt(pid));
+    if (!prod) return res.status(404).json({ error: `Product ${pid} not found` });
+    const available = prod.stockQuantity + (oldQty[pid] || 0);
+    if (newQty[pid] > available) {
+      return res.status(400).json({ error: `Only ${available} unit(s) of ${prod.name} available` });
+    }
+  }
+
+  // Apply net stock change for every affected product
+  const affected = new Set([...Object.keys(oldQty).map(Number), ...Object.keys(newQty).map(Number)]);
+  affected.forEach(pid => {
+    const prod = db.products.find(p => p.id === pid);
+    if (prod) prod.stockQuantity = prod.stockQuantity + (oldQty[pid] || 0) - (newQty[pid] || 0);
+  });
+
+  // Rebuild items and totals
+  let subtotal = 0;
+  const orderItems = Object.keys(newQty).map((pid, idx) => {
+    const prod = db.products.find(p => p.id === parseInt(pid));
+    const q = newQty[pid];
+    const itemSub = prod.price * q;
+    subtotal += itemSub;
+    return { id: idx + 1, productId: prod.id, productName: prod.name, unitPrice: prod.price, quantity: q, subtotal: itemSub };
+  });
+
+  order.items = orderItems;
+  order.subtotal = subtotal;
+  order.taxAmount = Number((subtotal * 0.05).toFixed(2));
+  order.grandTotal = Number((subtotal + order.taxAmount).toFixed(2));
+  if (typeof paymentMethod === 'string' && paymentMethod) order.paymentMethod = paymentMethod;
+  if (typeof notes === 'string') order.notes = notes;
+  order.updatedAt = new Date().toISOString();
+
+  res.json(order);
+});
+
+// Admin only: Delete an order and release its reserved stock
+app.delete('/api/orders/:id', (req, res) => {
+  const requesterId = req.query.requesterId || (req.body && req.body.requesterId);
+  const requester = db.users.find(u => u.id === parseInt(requesterId));
+  if (!requester || requester.role !== 'ADMIN') {
+    return res.status(403).json({ error: 'Only administrators can delete orders' });
+  }
+
+  const idx = db.orders.findIndex(o => o.id === parseInt(req.params.id));
+  if (idx === -1) return res.status(404).json({ error: 'Order not found' });
+
+  const order = db.orders[idx];
+  // Release reserved stock back to inventory
+  order.items.forEach(it => {
+    const prod = db.products.find(p => p.id === it.productId);
+    if (prod) prod.stockQuantity += it.quantity;
+  });
+
+  db.orders.splice(idx, 1);
+  res.json({ success: true, id: order.id, orderNumber: order.orderNumber });
+});
+
 // Seller (left-half) details — fixed per the Vardaan Enterprises tax invoice
 const SELLER = {
   name: 'VARDAAN ENTERPRISES',
@@ -437,14 +532,13 @@ function financialYearLabel(dateObj) {
   return `${String(startYear).slice(-2)}-${String(startYear + 1).slice(-2)}`;
 }
 
-app.get('/api/orders/:id/invoice', (req, res) => {
-  const order = db.orders.find(o => o.id === parseInt(req.params.id));
-  if (!order) return res.status(404).json({ error: 'Order not found' });
-
+// Builds the tax-invoice payload from an order and an explicit items array
+// (items may be a single order's items or merged items across clubbed orders)
+function buildTaxInvoice(order, items, opts = {}) {
   const dateObj = new Date(order.createdAt);
 
-  // Build per-line items with HSN, unit, and split CGST/SGST (2.5% each)
-  const lineItems = order.items.map((it, idx) => {
+  // Per-line HSN, unit, and split CGST/SGST (2.5% each)
+  const lineItems = items.map((it, idx) => {
     const prod = db.products.find(p => p.id === it.productId);
     const hsn = it.hsn || (prod && prod.hsn) || HSN_DEFAULTS[prod && prod.category] || '';
     const unit = it.unit || (prod && prod.unit) || '';
@@ -467,6 +561,7 @@ app.get('/api/orders/:id/invoice', (req, res) => {
     };
   });
 
+  const subtotal = items.reduce((s, it) => s + it.subtotal, 0);
   const rawTotal = lineItems.reduce((s, l) => s + l.amount, 0);
   const grandTotalRounded = Math.round(rawTotal);
   const roundOff = Number((grandTotalRounded - rawTotal).toFixed(2));
@@ -477,20 +572,61 @@ app.get('/api/orders/:id/invoice', (req, res) => {
   const stateCode = shopGst.slice(0, 2) || SELLER.gstin.slice(0, 2);
   const placeOfSupply = `${GST_STATE_NAMES[stateCode] || 'Delhi'} (${stateCode})`;
 
-  res.json({
+  return {
     order,
     seller: SELLER,
     lineItems,
-    subtotal: order.subtotal,
+    subtotal: Number(subtotal.toFixed(2)),
     totalCgst: Number(totalCgst.toFixed(2)),
     totalSgst: Number(totalSgst.toFixed(2)),
     roundOff,
     grandTotalRounded,
     placeOfSupply,
-    invoiceNumber: `VE/${order.id}/${financialYearLabel(dateObj)}`,
+    invoiceNumber: opts.invoiceNumber || `VE/${order.id}/${financialYearLabel(dateObj)}`,
+    sourceOrders: opts.sourceOrders || null,
     invoiceDate: dateObj.toLocaleString('en-IN', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit', hour12: true }),
     printedAt: new Date().toLocaleString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })
-  });
+  };
+}
+
+app.get('/api/orders/:id/invoice', (req, res) => {
+  const order = db.orders.find(o => o.id === parseInt(req.params.id));
+  if (!order) return res.status(404).json({ error: 'Order not found' });
+  res.json(buildTaxInvoice(order, order.items));
+});
+
+// Combined bill for clubbed orders (same shop). Products merged & quantities summed.
+app.get('/api/orders/combined-invoice', (req, res) => {
+  const ids = String(req.query.ids || '').split(',').map(s => parseInt(s)).filter(Boolean);
+  if (!ids.length) return res.status(400).json({ error: 'No order ids provided' });
+
+  const orders = ids.map(id => db.orders.find(o => o.id === id)).filter(Boolean);
+  if (!orders.length) return res.status(404).json({ error: 'Orders not found' });
+
+  const shopId = orders[0].shop.id;
+  if (!orders.every(o => o.shop.id === shopId)) {
+    return res.status(400).json({ error: 'Cannot combine orders from different shops' });
+  }
+
+  // Merge identical products, summing quantity and subtotal
+  const merged = {};
+  orders.forEach(o => o.items.forEach(it => {
+    if (!merged[it.productId]) {
+      merged[it.productId] = { productId: it.productId, productName: it.productName, unitPrice: it.unitPrice, quantity: 0, subtotal: 0 };
+    }
+    merged[it.productId].quantity += it.quantity;
+    merged[it.productId].subtotal += it.subtotal;
+  }));
+
+  // Earliest order carries the shop + date for the combined bill
+  const primary = orders.slice().sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt))[0];
+  const fy = financialYearLabel(new Date(primary.createdAt));
+  const invoiceNumber = `VE/${orders.map(o => o.id).join('-')}/${fy}`;
+
+  res.json(buildTaxInvoice(primary, Object.values(merged), {
+    invoiceNumber,
+    sourceOrders: orders.map(o => o.orderNumber)
+  }));
 });
 
 // Analytics Dashboard
