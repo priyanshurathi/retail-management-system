@@ -10,8 +10,7 @@ const state = {
     fieldTab: 'catalog',     // 'catalog' | 'orders'
     adminTab: 'orders',      // 'orders' | 'analytics' | 'products' | 'shops' | 'employees'
     adminDateFilter: 'today', // 'today' | 'yesterday' | 'last7' | 'last30'
-    clubByShop: false,        // consolidate same-shop same-date orders into one group
-    expandedGroups: {},       // { [groupKey]: true } expanded clubbed groups
+    analyticsRange: 'last7',  // analytics sub-tab: 'last7' | 'last30'
     editingOrderId: null,     // order currently open in the edit modal
     editItems: {},            // { [productId]: qty } working copy while editing
     editOriginalQty: {},      // { [productId]: qty } quantities the order held before editing
@@ -44,7 +43,7 @@ function refreshLucide() {
 // Data Fetching
 async function loadInitialData() {
     try {
-        // Fetch Demo Users (Admin + 20 Employees)
+        // Fetch Demo Users (Admin + field employees)
         const usersRes = await fetch('/api/auth/demo-users');
         if (usersRes.ok) {
             state.demoUsers = await usersRes.json();
@@ -52,6 +51,8 @@ async function loadInitialData() {
             state.currentUser = null;
             updateUserHeader();
             renderUserSwitcherMenu();
+            const agentCountEl = document.getElementById('nav-agent-count');
+            if (agentCountEl) agentCountEl.innerText = state.demoUsers.filter(u => u.role === 'EMPLOYEE').length;
         }
 
         // Fetch Shops
@@ -104,17 +105,14 @@ async function fetchAll(urls) {
 
 async function loadAdminData() {
     try {
-        const [dashRes, ordersRes] = await fetchAll(['/api/analytics/dashboard', '/api/orders']);
-        if (dashRes) {
-            state.dashboardStats = dashRes;
-            renderKPIs(dashRes);
-            renderAnalytics(dashRes);
-        }
+        const ordersRes = await fetch('/api/orders').then(r => r.ok ? r.json() : null);
         if (ordersRes) {
             state.adminOrders = ordersRes;
+            renderKPIs();
             renderAdminOrdersTable();
             updateStatusCounts();
         }
+        await loadAnalytics();
     } catch (err) {
         console.error('Failed to load admin data:', err);
     }
@@ -914,13 +912,41 @@ function renderAgentOrders() {
 }
 
 // Admin Fulfillment & Dispatch
-function renderKPIs(stats) {
-    if (!stats) return;
-    document.getElementById('kpi-total-revenue').innerText = `₹ ${stats.totalRevenue ? stats.totalRevenue.toLocaleString('en-IN', { minimumFractionDigits: 2 }) : '0.00'}`;
-    document.getElementById('kpi-total-orders').innerText = stats.totalOrders;
-    document.getElementById('kpi-pending-orders').innerText = stats.pendingOrders;
-    document.getElementById('kpi-shipped-orders').innerText = stats.shippedOrders;
-    document.getElementById('kpi-done-orders').innerText = stats.doneOrders;
+// KPI cards reflect the currently selected date-range tab
+function renderKPIs() {
+    const orders = state.adminOrders.filter(o => isInDateRange(o.createdAt, state.adminDateFilter));
+    const revenue = orders.reduce((s, o) => s + (o.status !== 'CANCELLED' ? o.grandTotal : 0), 0);
+    const set = (id, val) => { const el = document.getElementById(id); if (el) el.innerText = val; };
+    set('kpi-total-revenue', `₹ ${revenue.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`);
+    set('kpi-total-orders', orders.length);
+    set('kpi-pending-orders', orders.filter(o => o.status === 'PENDING').length);
+    set('kpi-shipped-orders', orders.filter(o => o.status === 'SHIPPED').length);
+    set('kpi-done-orders', orders.filter(o => o.status === 'DONE').length);
+}
+
+async function loadAnalytics() {
+    try {
+        const res = await fetch(`/api/analytics/dashboard?range=${state.analyticsRange}`);
+        if (res.ok) {
+            state.dashboardStats = await res.json();
+            renderAnalytics(state.dashboardStats);
+        }
+    } catch (err) {
+        console.error('Failed to load analytics:', err);
+    }
+}
+
+function switchAnalyticsRange(range) {
+    state.analyticsRange = range;
+    ['last7', 'last30'].forEach(r => {
+        const btn = document.getElementById(`analytics-range-${r}`);
+        if (btn) {
+            btn.className = r === range
+                ? 'px-3 py-1.5 rounded-lg text-xs font-bold transition bg-white text-blue-600 shadow-sm'
+                : 'px-3 py-1.5 rounded-lg text-xs font-bold text-slate-600 hover:text-slate-900 transition';
+        }
+    });
+    loadAnalytics();
 }
 
 function updateStatusCounts() {
@@ -944,27 +970,11 @@ function filterAdminByDate(range) {
             }
         }
     });
+    renderKPIs();
     renderAdminOrdersTable();
 }
 
-function toggleClubByShop() {
-    state.clubByShop = !state.clubByShop;
-    const btn = document.getElementById('club-toggle-btn');
-    if (btn) {
-        btn.className = state.clubByShop
-            ? 'px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 border border-blue-600 bg-blue-600 text-white transition whitespace-nowrap'
-            : 'px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 transition whitespace-nowrap';
-    }
-    renderAdminOrdersTable();
-    refreshLucide();
-}
-
-function toggleGroup(key) {
-    state.expandedGroups[key] = !state.expandedGroups[key];
-    renderAdminOrdersTable();
-}
-
-// Calendar-day key (local) used to club orders from the same shop on the same date
+// Calendar-day key (local) used to cluster orders from the same shop on the same date
 function dateKey(isoStr) {
     const d = new Date(isoStr);
     return `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
@@ -1019,14 +1029,9 @@ function renderAdminOrdersTable() {
         return;
     }
 
-    // Clubbed view: consolidate same-shop same-date orders into one group
-    if (state.clubByShop) {
-        renderClubbedGroups(filtered, tbody);
-        refreshLucide();
-        return;
-    }
-
-    // Group the filtered orders by status, rendered in workflow order
+    // Group the filtered orders by status, rendered in workflow order.
+    // Within each status, orders from the same shop on the same date are
+    // clustered together so the admin can see (and merge) them at a glance.
     const STATUS_ORDER = ['PENDING', 'SHIPPED', 'DONE', 'CANCELLED'];
     const groups = {};
     filtered.forEach(o => { (groups[o.status] = groups[o.status] || []).push(o); });
@@ -1050,7 +1055,48 @@ function renderAdminOrdersTable() {
         `;
         tbody.appendChild(headerTr);
 
-        orders.forEach(ord => tbody.appendChild(buildAdminOrderRow(ord)));
+        // Cluster this status's orders by shop + calendar date
+        const shopGroups = {};
+        orders.forEach(o => {
+            const key = `${o.shop.id}|${dateKey(o.createdAt)}`;
+            if (!shopGroups[key]) shopGroups[key] = [];
+            shopGroups[key].push(o);
+        });
+
+        Object.values(shopGroups).forEach(shopOrders => {
+            // Multiple same-shop orders: show a cluster sub-header (+ Merge if pending)
+            if (shopOrders.length > 1) {
+                const shop = shopOrders[0].shop;
+                const clusterTotal = shopOrders.reduce((s, o) => s + o.grandTotal, 0);
+                const ids = shopOrders.map(o => o.id).join(',');
+                const canMerge = status === 'PENDING';
+
+                const subTr = document.createElement('tr');
+                subTr.className = 'bg-blue-50/40';
+                subTr.innerHTML = `
+                    <td colspan="7" class="py-1.5 px-4 pl-8">
+                        <div class="flex items-center justify-between gap-2 flex-wrap">
+                            <span class="flex items-center gap-2 text-[11px]">
+                                <i data-lucide="store" class="w-3.5 h-3.5 text-blue-600"></i>
+                                <span class="font-bold text-slate-700">${shop.name}</span>
+                                <span class="text-slate-500">${shopOrders.length} orders on ${formatDate(shopOrders[0].createdAt)} • ₹ ${clusterTotal.toFixed(2)}</span>
+                            </span>
+                            ${canMerge ? `<button onclick="mergeOrders('${ids}', ${shopOrders.length})" class="px-2.5 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-[10px] font-bold flex items-center gap-1 transition">
+                                <i data-lucide="git-merge" class="w-3 h-3"></i><span>Merge ${shopOrders.length} orders</span>
+                            </button>` : `<span class="text-[10px] text-slate-400 italic">locked (already ${status.toLowerCase()})</span>`}
+                        </div>
+                    </td>
+                `;
+                tbody.appendChild(subTr);
+                shopOrders.forEach(ord => {
+                    const row = buildAdminOrderRow(ord);
+                    row.classList.add('bg-white');
+                    tbody.appendChild(row);
+                });
+            } else {
+                tbody.appendChild(buildAdminOrderRow(shopOrders[0]));
+            }
+        });
     });
 
     refreshLucide();
@@ -1114,7 +1160,7 @@ function buildAdminOrderRow(ord) {
         <td class="py-3 px-4 text-right">
             <div class="flex items-center justify-end space-x-1.5">
                 ${actionButtons}
-                ${ord.status !== 'DONE' ? `<button onclick="openEditOrderModal(${ord.id})" title="Edit Order"
+                ${ord.status === 'PENDING' ? `<button onclick="openEditOrderModal(${ord.id})" title="Edit Order"
                     class="p-1.5 rounded-lg bg-blue-50 hover:bg-blue-100 text-blue-600 transition">
                     <i data-lucide="pencil" class="w-3.5 h-3.5"></i>
                 </button>` : ''}
@@ -1130,65 +1176,6 @@ function buildAdminOrderRow(ord) {
         </td>
     `;
     return tr;
-}
-
-// Clubbed rendering: one expandable header per shop + calendar date
-function renderClubbedGroups(filtered, tbody) {
-    const groups = {};
-    filtered.forEach(o => {
-        const key = `${o.shop.id}|${dateKey(o.createdAt)}`;
-        if (!groups[key]) groups[key] = { key, shop: o.shop, date: o.createdAt, orders: [] };
-        groups[key].orders.push(o);
-    });
-
-    const groupList = Object.values(groups).sort((a, b) => new Date(b.date) - new Date(a.date));
-
-    groupList.forEach(g => {
-        const orders = g.orders;
-        const combinedTotal = orders.reduce((s, o) => s + o.grandTotal, 0);
-        const totalLines = orders.reduce((s, o) => s + o.items.length, 0);
-        const statusSet = [...new Set(orders.map(o => o.status))];
-        const expanded = !!state.expandedGroups[g.key];
-        const ids = orders.map(o => o.id).join(',');
-        const isMulti = orders.length > 1;
-
-        const statusHtml = statusSet.length === 1
-            ? `<span class="px-2 py-0.5 rounded-full text-[10px] font-extrabold uppercase tracking-wide ${getStatusBadgeClass(statusSet[0])}">${statusSet[0]}</span>`
-            : statusSet.map(s => `<span class="px-1.5 py-0.5 rounded text-[9px] font-bold uppercase ${getStatusBadgeClass(s)}">${orders.filter(o => o.status === s).length} ${s}</span>`).join(' ');
-
-        const header = document.createElement('tr');
-        header.className = 'bg-blue-50/60 border-t-2 border-blue-100';
-        header.innerHTML = `
-            <td colspan="7" class="py-2.5 px-4">
-                <div class="flex items-center justify-between gap-3 flex-wrap">
-                    <button onclick="toggleGroup('${g.key}')" class="flex items-center gap-2 text-left">
-                        <i data-lucide="${expanded ? 'chevron-down' : 'chevron-right'}" class="w-4 h-4 text-blue-600"></i>
-                        <span class="p-1.5 rounded-lg bg-blue-100 text-blue-700"><i data-lucide="store" class="w-3.5 h-3.5"></i></span>
-                        <span>
-                            <span class="font-bold text-slate-900 text-sm">${g.shop.name}</span>
-                            <span class="text-[10px] text-slate-500 ml-1">${g.shop.ownerName} • ${formatDate(g.date)}</span>
-                            <span class="block text-[10px] text-slate-500">${orders.length} order${isMulti ? 's' : ''} • ${totalLines} line items</span>
-                        </span>
-                    </button>
-                    <div class="flex items-center gap-2">
-                        ${statusHtml}
-                        <span class="font-extrabold text-slate-900 text-sm">₹ ${combinedTotal.toFixed(2)}</span>
-                        <button onclick="openCombinedBill('${ids}')" class="px-2.5 py-1 bg-slate-800 hover:bg-slate-900 text-white rounded-lg text-[11px] font-bold flex items-center gap-1 transition">
-                            <i data-lucide="receipt" class="w-3 h-3"></i><span>${isMulti ? 'Combined Bill' : 'Bill'}</span>
-                        </button>
-                        <button onclick="deleteOrderGroup('${ids}', ${orders.length})" class="px-2 py-1 bg-rose-50 hover:bg-rose-100 text-rose-600 rounded-lg text-[11px] font-bold flex items-center gap-1 transition">
-                            <i data-lucide="trash-2" class="w-3 h-3"></i><span>Delete</span>
-                        </button>
-                    </div>
-                </div>
-            </td>
-        `;
-        tbody.appendChild(header);
-
-        if (expanded) {
-            orders.forEach(o => tbody.appendChild(buildAdminOrderRow(o)));
-        }
-    });
 }
 
 async function updateOrderStatus(orderId, newStatus) {
@@ -1442,42 +1429,32 @@ async function deleteOrder(orderId) {
     }
 }
 
-async function deleteOrderGroup(idsStr, count) {
+// Merge several pending same-shop orders into one (before shipping)
+async function mergeOrders(idsStr, count) {
     if (!state.currentUser || state.currentUser.role !== 'ADMIN') {
-        showToast('Only administrators can delete orders', 'error');
+        showToast('Only administrators can merge orders', 'error');
         return;
     }
-    if (!confirm(`Delete all ${count} order(s) in this group? Stock will be returned to inventory.`)) return;
+    if (!confirm(`Merge these ${count} orders into a single order? Items will be combined and the separate orders removed.`)) return;
 
     const ids = idsStr.split(',').map(s => parseInt(s)).filter(Boolean);
     try {
-        for (const id of ids) {
-            await fetch(`/api/orders/${id}?requesterId=${state.currentUser.id}`, { method: 'DELETE' });
-        }
-        await loadProductsAndCategories();
-        await loadAdminData();
-        showToast(`${ids.length} order(s) deleted`, 'success');
-    } catch (e) {
-        console.error(e);
-        showToast('Server error while deleting orders', 'error');
-    }
-}
-
-async function openCombinedBill(idsStr) {
-    try {
-        const res = await fetch(`/api/orders/combined-invoice?ids=${idsStr}`);
+        const res = await fetch('/api/orders/merge', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ requesterId: state.currentUser.id, ids })
+        });
         if (res.ok) {
-            state.activeInvoiceData = await res.json();
-            renderInvoiceTemplate();
-            document.getElementById('invoice-modal').classList.remove('hidden');
-            refreshLucide();
+            const merged = await res.json();
+            await loadAdminData();
+            showToast(`Merged into ${merged.orderNumber} (${count} orders combined)`, 'success');
         } else {
             const err = await res.json().catch(() => ({}));
-            showToast(err.error || 'Failed to build combined bill', 'error');
+            showToast(err.error || 'Failed to merge orders', 'error');
         }
     } catch (e) {
         console.error(e);
-        showToast('Server error building combined bill', 'error');
+        showToast('Server error while merging orders', 'error');
     }
 }
 
@@ -1504,7 +1481,17 @@ function renderAdminCatalog() {
             </td>
             <td class="py-2.5 px-4"><span class="px-2 py-0.5 rounded bg-slate-100 text-slate-600 text-[10px] font-semibold">${p.category}</span></td>
             <td class="py-2.5 px-4 text-slate-600">${p.unit}</td>
-            <td class="py-2.5 px-4 font-bold text-blue-700">₹ ${p.price.toFixed(2)}</td>
+            <td class="py-2.5 px-4">
+                <div class="flex items-center gap-1.5">
+                    <span class="text-slate-400 text-xs">₹</span>
+                    <input type="number" min="0.01" step="0.01" value="${p.price.toFixed(2)}" id="price-input-${p.id}"
+                        class="w-24 px-2 py-1 rounded-lg border border-slate-200 text-xs font-bold text-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    <button onclick="updateProductPrice(${p.id})"
+                        class="px-2 py-1 bg-slate-700 hover:bg-slate-800 text-white rounded-lg text-[11px] font-bold transition active:scale-95">
+                        Save
+                    </button>
+                </div>
+            </td>
             <td class="py-2.5 px-4">
                 <div class="flex items-center gap-2">
                     <input type="number" min="0" value="${stock}" id="stock-input-${p.id}"
@@ -1555,6 +1542,43 @@ async function updateProductStock(productId) {
     } catch (e) {
         console.error(e);
         showToast('Server error while updating stock', 'error');
+    }
+}
+
+async function updateProductPrice(productId) {
+    if (!state.currentUser || state.currentUser.role !== 'ADMIN') {
+        showToast('Only administrators can update prices', 'error');
+        return;
+    }
+    const input = document.getElementById(`price-input-${productId}`);
+    if (!input) return;
+    const price = parseFloat(input.value);
+    if (isNaN(price) || price <= 0) {
+        showToast('Enter a valid price greater than 0', 'warning');
+        return;
+    }
+
+    try {
+        const res = await fetch(`/api/products/${productId}/price`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ price, requesterId: state.currentUser.id })
+        });
+
+        if (res.ok) {
+            const updated = await res.json();
+            const prod = state.products.find(p => p.id === productId);
+            if (prod) prod.price = updated.price;
+            renderAdminCatalog();
+            renderProducts();
+            showToast(`Price updated: ${updated.name} → ₹${updated.price.toFixed(2)} (existing orders keep old price)`, 'success');
+        } else {
+            const err = await res.json().catch(() => ({}));
+            showToast(err.error || 'Failed to update price', 'error');
+        }
+    } catch (e) {
+        console.error(e);
+        showToast('Server error while updating price', 'error');
     }
 }
 

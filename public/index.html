@@ -86,7 +86,7 @@
                         <div id="user-switch-menu" class="hidden absolute right-0 mt-2 w-72 bg-white rounded-2xl shadow-xl border border-slate-200 py-2 z-50 animate-in fade-in slide-in-from-top-2">
                             <div class="px-4 py-2 border-b border-slate-100">
                                 <p class="text-xs font-semibold text-slate-400 uppercase tracking-wider">Quick Demo Switcher</p>
-                                <p class="text-xs text-slate-600 mt-0.5">Switch between Admin & 20 Field Agents</p>
+                                <p class="text-xs text-slate-600 mt-0.5">Switch between Admin & Field Agents</p>
                             </div>
                             <div class="max-h-72 overflow-y-auto py-1" id="user-switcher-list">
                                 <!-- Populated dynamically -->
@@ -241,7 +241,7 @@
                     </button>
                     <button onclick="switchAdminTab('employees')" id="adm-tab-employees" class="px-4 py-2 rounded-xl bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 font-bold text-xs transition flex items-center space-x-1.5">
                         <i data-lucide="users" class="w-4 h-4"></i>
-                        <span>20 Field Agents</span>
+                        <span>Field Agents (<span id="nav-agent-count">5</span>)</span>
                     </button>
                 </div>
 
@@ -323,19 +323,11 @@
                             </button>
                         </div>
 
-                        <div class="flex items-center gap-2">
-                            <!-- Club-by-shop toggle -->
-                            <button onclick="toggleClubByShop()" id="club-toggle-btn" class="px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 transition whitespace-nowrap">
-                                <i data-lucide="layers" class="w-3.5 h-3.5"></i>
-                                <span>Club by Shop</span>
-                            </button>
-
-                            <!-- Search Box in Orders Table -->
-                            <div class="relative w-full sm:w-56">
-                                <i data-lucide="search" class="w-4 h-4 absolute left-3.5 top-2.5 text-slate-400"></i>
-                                <input type="text" id="admin-order-search" oninput="renderAdminOrdersTable()" placeholder="Search order, shop, agent..."
-                                    class="w-full pl-10 pr-4 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:ring-2 focus:ring-blue-500 focus:outline-none">
-                            </div>
+                        <!-- Search Box in Orders Table -->
+                        <div class="relative w-full sm:w-64">
+                            <i data-lucide="search" class="w-4 h-4 absolute left-3.5 top-2.5 text-slate-400"></i>
+                            <input type="text" id="admin-order-search" oninput="renderAdminOrdersTable()" placeholder="Search order, shop, agent..."
+                                class="w-full pl-10 pr-4 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:ring-2 focus:ring-blue-500 focus:outline-none">
                         </div>
                     </div>
 
@@ -363,13 +355,21 @@
 
             <!-- ADMIN TAB 2: ANALYTICS DASHBOARD -->
             <div id="adm-screen-analytics" class="hidden space-y-6">
+                <!-- Analytics date-range sub-tabs -->
+                <div class="flex items-center gap-2">
+                    <span class="text-xs font-bold text-slate-500 mr-1">Period:</span>
+                    <div class="flex items-center space-x-1.5 bg-slate-100 p-1 rounded-xl">
+                        <button onclick="switchAnalyticsRange('last7')" id="analytics-range-last7" class="px-3 py-1.5 rounded-lg text-xs font-bold transition bg-white text-blue-600 shadow-sm">Last 7 Days</button>
+                        <button onclick="switchAnalyticsRange('last30')" id="analytics-range-last30" class="px-3 py-1.5 rounded-lg text-xs font-bold text-slate-600 hover:text-slate-900 transition">Last 30 Days</button>
+                    </div>
+                </div>
                 <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
                     <!-- Top 5 Field Sales Reps Leaderboard -->
                     <div class="custom-card p-5">
                         <div class="flex items-center justify-between mb-4">
                             <div>
                                 <h3 class="font-bold text-slate-900 text-sm">Top Field Representatives (Leaderboard)</h3>
-                                <p class="text-xs text-slate-500">Sales volume ranking among the 20 field agents</p>
+                                <p class="text-xs text-slate-500">Sales volume ranking among field agents</p>
                             </div>
                             <span class="p-2 rounded-xl bg-amber-50 text-amber-600"><i data-lucide="trophy" class="w-4 h-4"></i></span>
                         </div>
@@ -432,7 +432,7 @@
                 <div class="flex items-center justify-between">
                     <div>
                         <h2 class="text-lg font-bold text-slate-900">Registered Retail Shops</h2>
-                        <p class="text-xs text-slate-500">Directory of retail partners visited by the 20 field agents</p>
+                        <p class="text-xs text-slate-500">Directory of retail partners visited by field agents</p>
                     </div>
                     <button onclick="openNewShopModal()" class="px-3.5 py-2 bg-blue-600 text-white rounded-xl text-xs font-bold flex items-center space-x-1.5 shadow-sm">
                         <i data-lucide="plus-circle" class="w-4 h-4"></i>

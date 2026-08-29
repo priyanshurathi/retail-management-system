@@ -269,6 +269,28 @@ app.patch('/api/products/:id/stock', (req, res) => {
   res.json(product);
 });
 
+// Admin only: Update a product's price. Already-placed orders keep the price
+// they were booked at (order items store their own unitPrice snapshot).
+app.patch('/api/products/:id/price', (req, res) => {
+  const { price, requesterId } = req.body;
+
+  const requester = db.users.find(u => u.id === parseInt(requesterId));
+  if (!requester || requester.role !== 'ADMIN') {
+    return res.status(403).json({ error: 'Only administrators can update prices' });
+  }
+
+  const product = db.products.find(p => p.id === parseInt(req.params.id));
+  if (!product) return res.status(404).json({ error: 'Product not found' });
+
+  const value = Number(price);
+  if (!(value > 0)) {
+    return res.status(400).json({ error: 'Price must be a positive number' });
+  }
+
+  product.price = Number(value.toFixed(2));
+  res.json(product);
+});
+
 // Admin only: Add a new product to the catalog
 app.post('/api/products', (req, res) => {
   const { requesterId, name, category, sku, unit, price, stockQuantity, minOrderQuantity, imageUrl, description, hsn } = req.body;
@@ -416,8 +438,8 @@ app.put('/api/orders/:id', (req, res) => {
 
   const order = db.orders.find(o => o.id === parseInt(req.params.id));
   if (!order) return res.status(404).json({ error: 'Order not found' });
-  if (order.status === 'DONE') {
-    return res.status(400).json({ error: 'Completed orders cannot be edited' });
+  if (order.status !== 'PENDING') {
+    return res.status(400).json({ error: 'Only pending orders can be edited (already shipped/completed)' });
   }
   if (!Array.isArray(items)) {
     return res.status(400).json({ error: 'Items array is required' });
@@ -425,7 +447,12 @@ app.put('/api/orders/:id', (req, res) => {
 
   // Quantities currently reserved by this order (to be released back to stock)
   const oldQty = {};
-  order.items.forEach(it => { oldQty[it.productId] = (oldQty[it.productId] || 0) + it.quantity; });
+  // Original unit prices, so a later product price change never re-prices this order
+  const priceSnapshot = {};
+  order.items.forEach(it => {
+    oldQty[it.productId] = (oldQty[it.productId] || 0) + it.quantity;
+    priceSnapshot[it.productId] = it.unitPrice;
+  });
 
   // Desired quantities after the edit (merge duplicate product lines)
   const newQty = {};
@@ -456,14 +483,16 @@ app.put('/api/orders/:id', (req, res) => {
     if (prod) prod.stockQuantity = prod.stockQuantity + (oldQty[pid] || 0) - (newQty[pid] || 0);
   });
 
-  // Rebuild items and totals
+  // Rebuild items and totals. Items already on the order keep their original
+  // unit price; only newly added products use the current catalog price.
   let subtotal = 0;
   const orderItems = Object.keys(newQty).map((pid, idx) => {
     const prod = db.products.find(p => p.id === parseInt(pid));
     const q = newQty[pid];
-    const itemSub = prod.price * q;
+    const unitPrice = priceSnapshot[pid] != null ? priceSnapshot[pid] : prod.price;
+    const itemSub = unitPrice * q;
     subtotal += itemSub;
-    return { id: idx + 1, productId: prod.id, productName: prod.name, unitPrice: prod.price, quantity: q, subtotal: itemSub };
+    return { id: idx + 1, productId: prod.id, productName: prod.name, unitPrice, quantity: q, subtotal: itemSub };
   });
 
   order.items = orderItems;
@@ -497,6 +526,66 @@ app.delete('/api/orders/:id', (req, res) => {
 
   db.orders.splice(idx, 1);
   res.json({ success: true, id: order.id, orderNumber: order.orderNumber });
+});
+
+// Admin only: Merge several pending orders from the SAME shop into one order.
+// Items are merged (quantities summed); original unit prices are preserved.
+app.post('/api/orders/merge', (req, res) => {
+  const { requesterId, ids } = req.body;
+
+  const requester = db.users.find(u => u.id === parseInt(requesterId));
+  if (!requester || requester.role !== 'ADMIN') {
+    return res.status(403).json({ error: 'Only administrators can merge orders' });
+  }
+
+  const orderIds = (Array.isArray(ids) ? ids : []).map(n => parseInt(n)).filter(Boolean);
+  if (orderIds.length < 2) {
+    return res.status(400).json({ error: 'Select at least two orders to merge' });
+  }
+
+  const orders = orderIds.map(id => db.orders.find(o => o.id === id)).filter(Boolean);
+  if (orders.length < 2) return res.status(404).json({ error: 'Orders not found' });
+
+  if (!orders.every(o => o.shop.id === orders[0].shop.id)) {
+    return res.status(400).json({ error: 'Only orders from the same shop can be merged' });
+  }
+  if (!orders.every(o => o.status === 'PENDING')) {
+    return res.status(400).json({ error: 'Only pending orders can be merged (shipped/completed orders are locked)' });
+  }
+
+  // Survivor = earliest order; others are folded in and removed
+  const survivor = orders.slice().sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt))[0];
+  const others = orders.filter(o => o.id !== survivor.id);
+
+  // Merge items by product, summing quantity and subtotal (keeps original prices)
+  const merged = {};
+  orders.forEach(o => o.items.forEach(it => {
+    if (!merged[it.productId]) {
+      merged[it.productId] = { productId: it.productId, productName: it.productName, unitPrice: it.unitPrice, quantity: 0, subtotal: 0 };
+    }
+    merged[it.productId].quantity += it.quantity;
+    merged[it.productId].subtotal += it.subtotal;
+  }));
+
+  const mergedItems = Object.values(merged).map((it, idx) => ({ id: idx + 1, ...it }));
+  const subtotal = mergedItems.reduce((s, it) => s + it.subtotal, 0);
+
+  survivor.items = mergedItems;
+  survivor.subtotal = subtotal;
+  survivor.taxAmount = Number((subtotal * 0.05).toFixed(2));
+  survivor.grandTotal = Number((subtotal + survivor.taxAmount).toFixed(2));
+  survivor.mergedFrom = orders.map(o => o.orderNumber);
+  const mergeNote = `Merged orders: ${orders.map(o => o.orderNumber).join(', ')}`;
+  survivor.notes = survivor.notes ? `${survivor.notes} | ${mergeNote}` : mergeNote;
+  survivor.updatedAt = new Date().toISOString();
+
+  // Remove the folded-in orders (stock stays reserved — same goods, one order now)
+  others.forEach(o => {
+    const i = db.orders.findIndex(x => x.id === o.id);
+    if (i !== -1) db.orders.splice(i, 1);
+  });
+
+  res.json(survivor);
 });
 
 // Seller (left-half) details — fixed per the Vardaan Enterprises tax invoice
@@ -630,17 +719,30 @@ app.get('/api/orders/combined-invoice', (req, res) => {
 });
 
 // Analytics Dashboard
+// True if an ISO timestamp falls within a rolling range key
+function inRange(isoStr, range) {
+  if (!range || range === 'all') return true;
+  const t = new Date(isoStr).getTime();
+  if (isNaN(t)) return false;
+  const DAY = 24 * 3600000;
+  const days = range === 'last30' ? 30 : 7; // default last7
+  return t >= Date.now() - days * DAY;
+}
+
 app.get('/api/analytics/dashboard', (req, res) => {
-  const totalOrders = db.orders.length;
-  const totalRevenue = db.orders.reduce((sum, o) => sum + (o.status !== 'CANCELLED' ? o.grandTotal : 0), 0);
-  const pendingOrders = db.orders.filter(o => o.status === 'PENDING').length;
-  const shippedOrders = db.orders.filter(o => o.status === 'SHIPPED').length;
-  const doneOrders = db.orders.filter(o => o.status === 'DONE').length;
-  const cancelledOrders = db.orders.filter(o => o.status === 'CANCELLED').length;
+  const range = req.query.range || 'all';
+  const orders = db.orders.filter(o => inRange(o.createdAt, range));
+
+  const totalOrders = orders.length;
+  const totalRevenue = orders.reduce((sum, o) => sum + (o.status !== 'CANCELLED' ? o.grandTotal : 0), 0);
+  const pendingOrders = orders.filter(o => o.status === 'PENDING').length;
+  const shippedOrders = orders.filter(o => o.status === 'SHIPPED').length;
+  const doneOrders = orders.filter(o => o.status === 'DONE').length;
+  const cancelledOrders = orders.filter(o => o.status === 'CANCELLED').length;
 
   // Top 5 Employees
   const empMap = {};
-  db.orders.forEach(o => {
+  orders.forEach(o => {
     if (o.status !== 'CANCELLED' && o.employee) {
       const key = `${o.employee.employeeCode} - ${o.employee.fullName}`;
       if (!empMap[key]) empMap[key] = { employee: key, orderCount: 0, revenue: 0 };
@@ -652,7 +754,7 @@ app.get('/api/analytics/dashboard', (req, res) => {
 
   // Top 5 Products
   const prodMap = {};
-  db.orders.forEach(o => {
+  orders.forEach(o => {
     if (o.status !== 'CANCELLED' && o.items) {
       o.items.forEach(it => {
         if (!prodMap[it.productName]) prodMap[it.productName] = { productName: it.productName, quantity: 0, revenue: 0 };
@@ -664,6 +766,7 @@ app.get('/api/analytics/dashboard', (req, res) => {
   const topProducts = Object.values(prodMap).sort((a, b) => b.quantity - a.quantity).slice(0, 5);
 
   res.json({
+    range,
     totalOrders,
     totalRevenue,
     pendingOrders,
@@ -672,7 +775,7 @@ app.get('/api/analytics/dashboard', (req, res) => {
     cancelledOrders,
     topEmployees,
     topProducts,
-    recentOrders: [...db.orders].reverse().slice(0, 10)
+    recentOrders: [...orders].reverse().slice(0, 10)
   });
 });
 
