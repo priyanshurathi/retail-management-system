@@ -9,7 +9,7 @@ const state = {
     mainView: 'field-sales', // 'field-sales' | 'admin-portal'
     fieldTab: 'catalog',     // 'catalog' | 'orders'
     adminTab: 'orders',      // 'orders' | 'analytics' | 'products' | 'shops' | 'employees'
-    adminStatusFilter: 'ALL',
+    adminDateFilter: 'today', // 'today' | 'yesterday' | 'last7' | 'last30'
     shops: [],
     selectedShopId: null,
     products: [],
@@ -920,24 +920,20 @@ function renderKPIs(stats) {
 }
 
 function updateStatusCounts() {
-    const all = state.adminOrders.length;
-    const pending = state.adminOrders.filter(o => o.status === 'PENDING').length;
-    const shipped = state.adminOrders.filter(o => o.status === 'SHIPPED').length;
-    const done = state.adminOrders.filter(o => o.status === 'DONE').length;
-
-    document.getElementById('count-all').innerText = all;
-    document.getElementById('count-pending').innerText = pending;
-    document.getElementById('count-shipped').innerText = shipped;
-    document.getElementById('count-done').innerText = done;
+    DATE_RANGES.forEach(r => {
+        const el = document.getElementById(`count-date-${r}`);
+        if (el) el.innerText = state.adminOrders.filter(o => isInDateRange(o.createdAt, r)).length;
+    });
 }
 
-function filterAdminOrders(status) {
-    state.adminStatusFilter = status;
-    const statuses = ['ALL', 'PENDING', 'SHIPPED', 'DONE'];
-    statuses.forEach(s => {
-        const btn = document.getElementById(`filter-status-${s}`);
+const DATE_RANGES = ['today', 'yesterday', 'last7', 'last30'];
+
+function filterAdminByDate(range) {
+    state.adminDateFilter = range;
+    DATE_RANGES.forEach(r => {
+        const btn = document.getElementById(`filter-date-${r}`);
         if (btn) {
-            if (s === status) {
+            if (r === range) {
                 btn.className = 'px-3 py-1.5 rounded-lg text-xs font-bold transition bg-white text-blue-600 shadow-sm';
             } else {
                 btn.className = 'px-3 py-1.5 rounded-lg text-xs font-bold text-slate-600 hover:text-slate-900 transition';
@@ -945,6 +941,26 @@ function filterAdminOrders(status) {
         }
     });
     renderAdminOrdersTable();
+}
+
+// Returns true if an ISO timestamp falls within the given date range key
+function isInDateRange(isoStr, range) {
+    if (!isoStr) return false;
+    const t = new Date(isoStr).getTime();
+    if (isNaN(t)) return false;
+
+    const now = new Date();
+    const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+    const startOfYesterday = startOfToday - 24 * 3600000;
+    const DAY = 24 * 3600000;
+
+    switch (range) {
+        case 'today': return t >= startOfToday;
+        case 'yesterday': return t >= startOfYesterday && t < startOfToday;
+        case 'last7': return t >= now.getTime() - 7 * DAY;
+        case 'last30': return t >= now.getTime() - 30 * DAY;
+        default: return true;
+    }
 }
 
 function renderAdminOrdersTable() {
@@ -955,12 +971,12 @@ function renderAdminOrdersTable() {
     const query = (document.getElementById('admin-order-search')?.value || '').toLowerCase();
 
     const filtered = state.adminOrders.filter(ord => {
-        const matchesStatus = state.adminStatusFilter === 'ALL' || ord.status === state.adminStatusFilter;
-        const matchesSearch = !query || 
+        const matchesDate = isInDateRange(ord.createdAt, state.adminDateFilter);
+        const matchesSearch = !query ||
                               ord.orderNumber.toLowerCase().includes(query) ||
                               ord.shop.name.toLowerCase().includes(query) ||
                               ord.employee.fullName.toLowerCase().includes(query);
-        return matchesStatus && matchesSearch;
+        return matchesDate && matchesSearch;
     });
 
     if (filtered.length === 0) {
@@ -968,7 +984,7 @@ function renderAdminOrdersTable() {
             <tr>
                 <td colspan="7" class="py-8 text-center text-slate-400">
                     <i data-lucide="package-open" class="w-8 h-8 mx-auto mb-1 opacity-40"></i>
-                    <p class="font-semibold text-xs">No orders matching selected criteria</p>
+                    <p class="font-semibold text-xs">No orders in the selected period</p>
                 </td>
             </tr>
         `;
@@ -976,75 +992,102 @@ function renderAdminOrdersTable() {
         return;
     }
 
-    filtered.forEach(ord => {
-        const tr = document.createElement('tr');
-        tr.className = 'hover:bg-slate-50/80 transition-colors';
+    // Group the filtered orders by status, rendered in workflow order
+    const STATUS_ORDER = ['PENDING', 'SHIPPED', 'DONE', 'CANCELLED'];
+    const groups = {};
+    filtered.forEach(o => { (groups[o.status] = groups[o.status] || []).push(o); });
 
-        const badgeClass = getStatusBadgeClass(ord.status);
-        const dateStr = formatDate(ord.createdAt);
+    STATUS_ORDER.filter(s => groups[s] && groups[s].length).forEach(status => {
+        const orders = groups[status];
+        const groupTotal = orders.reduce((sum, o) => sum + (o.grandTotal || 0), 0);
 
-        // Dynamic Action Buttons according to workflow: Mark Shipped / Mark Done
-        let actionButtons = '';
-        if (ord.status === 'PENDING') {
-            actionButtons = `
-                <button onclick="updateOrderStatus(${ord.id}, 'SHIPPED')" class="px-2.5 py-1 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-bold text-[11px] flex items-center space-x-1 shadow-xs transition">
-                    <i data-lucide="truck" class="w-3 h-3"></i>
-                    <span>Mark Shipped</span>
-                </button>
-            `;
-        } else if (ord.status === 'SHIPPED') {
-            actionButtons = `
-                <button onclick="updateOrderStatus(${ord.id}, 'DONE')" class="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-bold text-[11px] flex items-center space-x-1 shadow-xs transition">
-                    <i data-lucide="check" class="w-3 h-3"></i>
-                    <span>Mark Done</span>
-                </button>
-            `;
-        } else if (ord.status === 'DONE') {
-            actionButtons = `
-                <span class="text-emerald-700 font-bold text-[11px] flex items-center space-x-1">
-                    <i data-lucide="check-check" class="w-3.5 h-3.5"></i>
-                    <span>Completed</span>
-                </span>
-            `;
-        }
-
-        tr.innerHTML = `
-            <td class="py-3 px-4">
-                <div class="font-mono font-bold text-slate-900">${ord.orderNumber}</div>
-                <div class="text-[10px] text-slate-400">${dateStr}</div>
-            </td>
-            <td class="py-3 px-4">
-                <div class="font-bold text-slate-800">${ord.shop.name}</div>
-                <div class="text-[10px] text-slate-500">${ord.shop.ownerName} • ${ord.shop.phone}</div>
-            </td>
-            <td class="py-3 px-4">
-                <div class="font-semibold text-slate-800">${ord.employee.fullName}</div>
-                <div class="text-[10px] text-blue-600 font-mono font-bold">${ord.employee.employeeCode}</div>
-            </td>
-            <td class="py-3 px-4">
-                <div class="font-extrabold text-slate-900">₹ ${ord.grandTotal.toFixed(2)}</div>
-                <div class="text-[10px] text-slate-500">${ord.items.length} Products</div>
-            </td>
-            <td class="py-3 px-4">
-                <span class="px-2 py-0.5 rounded bg-slate-100 text-slate-700 text-[10px] font-semibold">${ord.paymentMethod}</span>
-            </td>
-            <td class="py-3 px-4">
-                <span class="px-2.5 py-1 rounded-full text-[10px] font-extrabold uppercase tracking-wide ${badgeClass}">${ord.status}</span>
-            </td>
-            <td class="py-3 px-4 text-right">
-                <div class="flex items-center justify-end space-x-2">
-                    ${actionButtons}
-                    <button onclick="openInvoiceModal(${ord.id})" title="Print Bill / Invoice" 
-                        class="p-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 transition">
-                        <i data-lucide="printer" class="w-3.5 h-3.5"></i>
-                    </button>
+        const headerTr = document.createElement('tr');
+        headerTr.className = 'bg-slate-50/90';
+        headerTr.innerHTML = `
+            <td colspan="7" class="py-2 px-4">
+                <div class="flex items-center justify-between">
+                    <span class="flex items-center space-x-2">
+                        <span class="px-2.5 py-1 rounded-full text-[10px] font-extrabold uppercase tracking-wide ${getStatusBadgeClass(status)}">${status}</span>
+                        <span class="text-xs font-bold text-slate-600">${orders.length} order${orders.length === 1 ? '' : 's'}</span>
+                    </span>
+                    <span class="text-[11px] font-bold text-slate-500">₹ ${groupTotal.toFixed(2)}</span>
                 </div>
             </td>
         `;
-        tbody.appendChild(tr);
+        tbody.appendChild(headerTr);
+
+        orders.forEach(ord => tbody.appendChild(buildAdminOrderRow(ord)));
     });
 
     refreshLucide();
+}
+
+function buildAdminOrderRow(ord) {
+    const tr = document.createElement('tr');
+    tr.className = 'hover:bg-slate-50/80 transition-colors';
+
+    const badgeClass = getStatusBadgeClass(ord.status);
+    const dateStr = formatDate(ord.createdAt);
+
+    // Dynamic Action Buttons according to workflow: Mark Shipped / Mark Done
+    let actionButtons = '';
+    if (ord.status === 'PENDING') {
+        actionButtons = `
+            <button onclick="updateOrderStatus(${ord.id}, 'SHIPPED')" class="px-2.5 py-1 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-bold text-[11px] flex items-center space-x-1 shadow-xs transition">
+                <i data-lucide="truck" class="w-3 h-3"></i>
+                <span>Mark Shipped</span>
+            </button>
+        `;
+    } else if (ord.status === 'SHIPPED') {
+        actionButtons = `
+            <button onclick="updateOrderStatus(${ord.id}, 'DONE')" class="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-bold text-[11px] flex items-center space-x-1 shadow-xs transition">
+                <i data-lucide="check" class="w-3 h-3"></i>
+                <span>Mark Done</span>
+            </button>
+        `;
+    } else if (ord.status === 'DONE') {
+        actionButtons = `
+            <span class="text-emerald-700 font-bold text-[11px] flex items-center space-x-1">
+                <i data-lucide="check-check" class="w-3.5 h-3.5"></i>
+                <span>Completed</span>
+            </span>
+        `;
+    }
+
+    tr.innerHTML = `
+        <td class="py-3 px-4">
+            <div class="font-mono font-bold text-slate-900">${ord.orderNumber}</div>
+            <div class="text-[10px] text-slate-400">${dateStr}</div>
+        </td>
+        <td class="py-3 px-4">
+            <div class="font-bold text-slate-800">${ord.shop.name}</div>
+            <div class="text-[10px] text-slate-500">${ord.shop.ownerName} • ${ord.shop.phone}</div>
+        </td>
+        <td class="py-3 px-4">
+            <div class="font-semibold text-slate-800">${ord.employee.fullName}</div>
+            <div class="text-[10px] text-blue-600 font-mono font-bold">${ord.employee.employeeCode}</div>
+        </td>
+        <td class="py-3 px-4">
+            <div class="font-extrabold text-slate-900">₹ ${ord.grandTotal.toFixed(2)}</div>
+            <div class="text-[10px] text-slate-500">${ord.items.length} Products</div>
+        </td>
+        <td class="py-3 px-4">
+            <span class="px-2 py-0.5 rounded bg-slate-100 text-slate-700 text-[10px] font-semibold">${ord.paymentMethod}</span>
+        </td>
+        <td class="py-3 px-4">
+            <span class="px-2.5 py-1 rounded-full text-[10px] font-extrabold uppercase tracking-wide ${badgeClass}">${ord.status}</span>
+        </td>
+        <td class="py-3 px-4 text-right">
+            <div class="flex items-center justify-end space-x-2">
+                ${actionButtons}
+                <button onclick="openInvoiceModal(${ord.id})" title="Print Bill / Invoice"
+                    class="p-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 transition">
+                    <i data-lucide="printer" class="w-3.5 h-3.5"></i>
+                </button>
+            </div>
+        </td>
+    `;
+    return tr;
 }
 
 async function updateOrderStatus(orderId, newStatus) {
@@ -1147,6 +1190,76 @@ async function updateProductStock(productId) {
     } catch (e) {
         console.error(e);
         showToast('Server error while updating stock', 'error');
+    }
+}
+
+function openAddProductModal() {
+    if (!state.currentUser || state.currentUser.role !== 'ADMIN') {
+        showToast('Only administrators can add products', 'error');
+        return;
+    }
+    // Populate category (company) dropdown from existing categories
+    const select = document.getElementById('new-prod-category');
+    if (select) {
+        select.innerHTML = '';
+        state.categories.forEach(cat => {
+            const opt = document.createElement('option');
+            opt.value = cat;
+            opt.innerText = cat;
+            select.appendChild(opt);
+        });
+    }
+    document.getElementById('add-product-form').reset();
+    document.getElementById('add-product-modal').classList.remove('hidden');
+    refreshLucide();
+}
+
+function closeAddProductModal() {
+    document.getElementById('add-product-modal').classList.add('hidden');
+}
+
+async function handleAddProduct(e) {
+    e.preventDefault();
+    if (!state.currentUser || state.currentUser.role !== 'ADMIN') {
+        showToast('Only administrators can add products', 'error');
+        return;
+    }
+
+    const payload = {
+        requesterId: state.currentUser.id,
+        name: document.getElementById('new-prod-name').value,
+        category: document.getElementById('new-prod-category').value,
+        sku: document.getElementById('new-prod-sku').value,
+        unit: document.getElementById('new-prod-unit').value,
+        price: document.getElementById('new-prod-price').value,
+        stockQuantity: document.getElementById('new-prod-stock').value,
+        minOrderQuantity: document.getElementById('new-prod-minqty').value,
+        imageUrl: document.getElementById('new-prod-image').value,
+        description: document.getElementById('new-prod-description').value
+    };
+
+    try {
+        const res = await fetch('/api/products', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+
+        if (res.ok) {
+            const created = await res.json();
+            closeAddProductModal();
+            // Refresh catalog + categories so new company categories appear everywhere
+            await loadProductsAndCategories();
+            renderCategoryPills();
+            renderProducts();
+            showToast(`Product "${created.name}" added to ${created.category}`, 'success');
+        } else {
+            const err = await res.json().catch(() => ({}));
+            showToast(err.error || 'Failed to add product', 'error');
+        }
+    } catch (err) {
+        console.error(err);
+        showToast('Server error while adding product', 'error');
     }
 }
 

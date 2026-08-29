@@ -34,36 +34,36 @@ const db = {
     { id: 16, name: 'Saraswati General Store', ownerName: 'Santosh Pandey', phone: '+91 98201 66778', address: 'University South Gate, College Road', territory: 'University Town & Hostel Zone', email: 'saraswatistore@gmail.com', gstNumber: '07PPPPP5555P1Z0', active: true }
   ],
   products: [
-    { id: 1, sku: 'SNK-001', name: 'Parle-G Gold Glucose Biscuit', category: 'Snacks & Biscuits', unit: 'Box of 24 Packs', price: 240, stockQuantity: 150, minOrderQuantity: 2, imageUrl: '🍪', description: 'Classic energy biscuits in wholesale master pack', active: true },
-    { id: 2, sku: 'SNK-002', name: 'Britannia Good Day Butter Cookies', category: 'Snacks & Biscuits', unit: 'Box of 30 Packs', price: 450, stockQuantity: 120, minOrderQuantity: 2, imageUrl: '🍪', description: 'Rich butter crunchy cookies wholesale carton', active: true },
-    { id: 3, sku: 'SNK-003', name: "Lay's Magic Masala Potato Chips", category: 'Snacks & Biscuits', unit: 'Carton of 48 Packs', price: 720, stockQuantity: 90, minOrderQuantity: 1, imageUrl: '🥔', description: 'Spicy Indian magic masala potato chips 30g pack', active: true },
-    { id: 4, sku: 'SNK-004', name: 'Kurkure Masala Munch', category: 'Snacks & Biscuits', unit: 'Carton of 48 Packs', price: 720, stockQuantity: 110, minOrderQuantity: 1, imageUrl: '🌽', description: 'Crispy spiced corn puffs popular snack pack', active: true },
-    { id: 5, sku: 'SNK-005', name: 'Cadbury Oreo Vanilla Creme', category: 'Snacks & Biscuits', unit: 'Box of 24 Packs', price: 480, stockQuantity: 85, minOrderQuantity: 2, imageUrl: '🍫', description: 'Chocolate sandwich biscuit with smooth vanilla creme', active: true },
-    { id: 6, sku: 'SNK-006', name: "Haldiram's Nagpur Aloo Bhujia 400g", category: 'Snacks & Biscuits', unit: 'Case of 12 Packs', price: 960, stockQuantity: 75, minOrderQuantity: 1, imageUrl: '🥨', description: 'Traditional savoury spicy potato & gram flour crisps', active: true },
-    { id: 7, sku: 'BEV-001', name: 'Coca-Cola Original 250ml Can', category: 'Beverages & Drinks', unit: 'Case of 24 Cans', price: 840, stockQuantity: 140, minOrderQuantity: 2, imageUrl: '🥤', description: 'Sparkling refreshing cola drink chilled cans', active: true },
-    { id: 8, sku: 'BEV-002', name: 'Frooti Fresh Mango Drink 200ml', category: 'Beverages & Drinks', unit: 'Tetra Pack of 30', price: 540, stockQuantity: 160, minOrderQuantity: 2, imageUrl: '🧃', description: 'Juicy mango drink tetra pack popular with retailers', active: true },
-    { id: 9, sku: 'BEV-003', name: 'Red Bull Energy Drink 250ml', category: 'Beverages & Drinks', unit: 'Pack of 24 Cans', price: 2400, stockQuantity: 50, minOrderQuantity: 1, imageUrl: '⚡', description: 'Premium energy drink wholesale crate', active: true },
-    { id: 10, sku: 'BEV-004', name: 'Tata Tea Premium Leaf 500g', category: 'Beverages & Drinks', unit: 'Carton of 12 Packs', price: 2160, stockQuantity: 65, minOrderQuantity: 1, imageUrl: '🍵', description: 'Desh ki Chai blended premium black tea leaves', active: true },
-    { id: 11, sku: 'BEV-005', name: 'Nescafe Classic Instant Coffee 50g', category: 'Beverages & Drinks', unit: 'Jar Pack of 12', price: 1680, stockQuantity: 80, minOrderQuantity: 1, imageUrl: '☕', description: 'Rich aroma pure soluble coffee glass jars', active: true },
-    { id: 12, sku: 'BEV-006', name: 'Bisleri Packaged Drinking Water 1L', category: 'Beverages & Drinks', unit: 'Crate of 12 Bottles', price: 180, stockQuantity: 200, minOrderQuantity: 3, imageUrl: '💧', description: 'Mineral purified water wholesale crate', active: true },
-    { id: 13, sku: 'STP-001', name: 'Fortune Sunlite Refined Oil 1L', category: 'Staples & Cooking', unit: 'Carton of 12 Pouches', price: 1560, stockQuantity: 100, minOrderQuantity: 1, imageUrl: '🛢️', description: 'Refined sunflower cooking oil pouch carton', active: true },
-    { id: 14, sku: 'STP-002', name: 'India Gate Basmati Rice Feast 5kg', category: 'Staples & Cooking', unit: 'Bag of 4 Units', price: 1800, stockQuantity: 70, minOrderQuantity: 1, imageUrl: '🍚', description: 'Long grain fragrant premium basmati rice', active: true },
-    { id: 15, sku: 'STP-003', name: 'Aashirvaad Shudh Chakki Atta 10kg', category: 'Staples & Cooking', unit: 'Bag of 2 Units', price: 780, stockQuantity: 90, minOrderQuantity: 1, imageUrl: '🌾', description: '100% whole wheat whole flour sacks', active: true },
-    { id: 16, sku: 'STP-004', name: 'Tata Salt Vacuum Evaporated 1kg', category: 'Staples & Cooking', unit: 'Sack of 25 Packs', price: 550, stockQuantity: 120, minOrderQuantity: 2, imageUrl: '🧂', description: 'Iodized refined cooking salt master sack', active: true },
-    { id: 17, sku: 'STP-005', name: 'MDH Deggi Mirch Powder 100g', category: 'Staples & Cooking', unit: 'Pack of 10 Boxes', price: 650, stockQuantity: 95, minOrderQuantity: 1, imageUrl: '🌶️', description: 'Rich red color mild spicy chilli blend', active: true },
-    { id: 18, sku: 'STP-006', name: 'Catch Super Garam Masala 100g', category: 'Staples & Cooking', unit: 'Pack of 10 Boxes', price: 750, stockQuantity: 80, minOrderQuantity: 1, imageUrl: '🌿', description: 'Authentic roasted spice mix for savory curries', active: true },
-    { id: 19, sku: 'DAR-001', name: 'Amul Butter Pasteurised 500g', category: 'Dairy & Breakfast', unit: 'Box of 20 Packs', price: 4900, stockQuantity: 45, minOrderQuantity: 1, imageUrl: '🧈', description: 'Pure dairy cream butter wholesale refrigerated pack', active: true },
-    { id: 20, sku: 'DAR-002', name: "Kellogg's Corn Flakes Original 475g", category: 'Dairy & Breakfast', unit: 'Case of 12 Packs', price: 2040, stockQuantity: 60, minOrderQuantity: 1, imageUrl: '🥣', description: 'Crispy toasted whole grain breakfast cereal', active: true },
-    { id: 21, sku: 'DAR-003', name: 'Quaker Whole Rolled Oats 1kg', category: 'Dairy & Breakfast', unit: 'Pack of 8 Pouches', price: 1440, stockQuantity: 55, minOrderQuantity: 1, imageUrl: '🥣', description: '100% natural wholegrain dietary fiber oats', active: true },
-    { id: 22, sku: 'DAR-004', name: 'Kissan Fresh Tomato Ketchup 1kg', category: 'Dairy & Breakfast', unit: 'Case of 12 Bottles', price: 1440, stockQuantity: 70, minOrderQuantity: 1, imageUrl: '🍅', description: 'Sweet tangy tomato ketchup squeezy bottles', active: true },
-    { id: 23, sku: 'DAR-005', name: 'Nutella Hazelnut Cocoa Spread 350g', category: 'Dairy & Breakfast', unit: 'Case of 6 Jars', price: 1920, stockQuantity: 40, minOrderQuantity: 1, imageUrl: '🍫', description: 'Creamy chocolate hazelnut breakfast spread', active: true },
-    { id: 24, sku: 'PER-001', name: 'Dettol Original Bath Soap 125g', category: 'Personal Care & Hygiene', unit: 'Bundle of 16 Bars', price: 720, stockQuantity: 110, minOrderQuantity: 2, imageUrl: '🧼', description: 'Antibacterial trusted germ protection soap', active: true },
-    { id: 25, sku: 'PER-002', name: 'Colgate Strong Teeth Toothpaste 150g', category: 'Personal Care & Hygiene', unit: 'Carton of 24 Tubes', price: 1680, stockQuantity: 95, minOrderQuantity: 1, imageUrl: '🪥', description: 'Calcium boosted cavity protection toothpaste', active: true },
-    { id: 26, sku: 'PER-003', name: 'Head & Shoulders Shampoo 180ml', category: 'Personal Care & Hygiene', unit: 'Pack of 12 Bottles', price: 1920, stockQuantity: 60, minOrderQuantity: 1, imageUrl: '🧴', description: 'Smooth & silky anti-dandruff daily shampoo', active: true },
-    { id: 27, sku: 'PER-004', name: 'Lifebuoy Total Handwash Refill 750ml', category: 'Personal Care & Hygiene', unit: 'Box of 8 Pouches', price: 880, stockQuantity: 85, minOrderQuantity: 1, imageUrl: '🧴', description: 'Fast acting antibacterial handwash liquid', active: true },
-    { id: 28, sku: 'PER-005', name: 'Nivea Soft Light Moisturizer 200ml', category: 'Personal Care & Hygiene', unit: 'Pack of 6 Jars', price: 1500, stockQuantity: 50, minOrderQuantity: 1, imageUrl: '✨', description: 'Non-greasy nourishing skin cream with Vitamin E', active: true },
-    { id: 29, sku: 'HOU-001', name: 'Surf Excel Easy Wash Detergent 1kg', category: 'Household & Cleaning', unit: 'Bag of 10 Packs', price: 1350, stockQuantity: 90, minOrderQuantity: 1, imageUrl: '🧺', description: 'Advanced stain removal washing powder', active: true },
-    { id: 30, sku: 'HOU-002', name: 'Vim Lemon Dishwash Liquid 500ml', category: 'Household & Cleaning', unit: 'Pack of 12 Bottles', price: 1080, stockQuantity: 105, minOrderQuantity: 1, imageUrl: '🍋', description: 'Concentrated grease removal lemon dish gel', active: true }
+    { id: 1, sku: 'SNK-001', name: 'Parle-G Gold Glucose Biscuit', category: 'Company 1', unit: 'Box of 24 Packs', price: 240, stockQuantity: 150, minOrderQuantity: 2, imageUrl: '🍪', description: 'Classic energy biscuits in wholesale master pack', active: true },
+    { id: 2, sku: 'SNK-002', name: 'Britannia Good Day Butter Cookies', category: 'Company 1', unit: 'Box of 30 Packs', price: 450, stockQuantity: 120, minOrderQuantity: 2, imageUrl: '🍪', description: 'Rich butter crunchy cookies wholesale carton', active: true },
+    { id: 3, sku: 'SNK-003', name: "Lay's Magic Masala Potato Chips", category: 'Company 1', unit: 'Carton of 48 Packs', price: 720, stockQuantity: 90, minOrderQuantity: 1, imageUrl: '🥔', description: 'Spicy Indian magic masala potato chips 30g pack', active: true },
+    { id: 4, sku: 'SNK-004', name: 'Kurkure Masala Munch', category: 'Company 1', unit: 'Carton of 48 Packs', price: 720, stockQuantity: 110, minOrderQuantity: 1, imageUrl: '🌽', description: 'Crispy spiced corn puffs popular snack pack', active: true },
+    { id: 5, sku: 'SNK-005', name: 'Cadbury Oreo Vanilla Creme', category: 'Company 1', unit: 'Box of 24 Packs', price: 480, stockQuantity: 85, minOrderQuantity: 2, imageUrl: '🍫', description: 'Chocolate sandwich biscuit with smooth vanilla creme', active: true },
+    { id: 6, sku: 'SNK-006', name: "Haldiram's Nagpur Aloo Bhujia 400g", category: 'Company 1', unit: 'Case of 12 Packs', price: 960, stockQuantity: 75, minOrderQuantity: 1, imageUrl: '🥨', description: 'Traditional savoury spicy potato & gram flour crisps', active: true },
+    { id: 7, sku: 'BEV-001', name: 'Coca-Cola Original 250ml Can', category: 'Company 2', unit: 'Case of 24 Cans', price: 840, stockQuantity: 140, minOrderQuantity: 2, imageUrl: '🥤', description: 'Sparkling refreshing cola drink chilled cans', active: true },
+    { id: 8, sku: 'BEV-002', name: 'Frooti Fresh Mango Drink 200ml', category: 'Company 2', unit: 'Tetra Pack of 30', price: 540, stockQuantity: 160, minOrderQuantity: 2, imageUrl: '🧃', description: 'Juicy mango drink tetra pack popular with retailers', active: true },
+    { id: 9, sku: 'BEV-003', name: 'Red Bull Energy Drink 250ml', category: 'Company 2', unit: 'Pack of 24 Cans', price: 2400, stockQuantity: 50, minOrderQuantity: 1, imageUrl: '⚡', description: 'Premium energy drink wholesale crate', active: true },
+    { id: 10, sku: 'BEV-004', name: 'Tata Tea Premium Leaf 500g', category: 'Company 2', unit: 'Carton of 12 Packs', price: 2160, stockQuantity: 65, minOrderQuantity: 1, imageUrl: '🍵', description: 'Desh ki Chai blended premium black tea leaves', active: true },
+    { id: 11, sku: 'BEV-005', name: 'Nescafe Classic Instant Coffee 50g', category: 'Company 2', unit: 'Jar Pack of 12', price: 1680, stockQuantity: 80, minOrderQuantity: 1, imageUrl: '☕', description: 'Rich aroma pure soluble coffee glass jars', active: true },
+    { id: 12, sku: 'BEV-006', name: 'Bisleri Packaged Drinking Water 1L', category: 'Company 2', unit: 'Crate of 12 Bottles', price: 180, stockQuantity: 200, minOrderQuantity: 3, imageUrl: '💧', description: 'Mineral purified water wholesale crate', active: true },
+    { id: 13, sku: 'STP-001', name: 'Fortune Sunlite Refined Oil 1L', category: 'Company 3', unit: 'Carton of 12 Pouches', price: 1560, stockQuantity: 100, minOrderQuantity: 1, imageUrl: '🛢️', description: 'Refined sunflower cooking oil pouch carton', active: true },
+    { id: 14, sku: 'STP-002', name: 'India Gate Basmati Rice Feast 5kg', category: 'Company 3', unit: 'Bag of 4 Units', price: 1800, stockQuantity: 70, minOrderQuantity: 1, imageUrl: '🍚', description: 'Long grain fragrant premium basmati rice', active: true },
+    { id: 15, sku: 'STP-003', name: 'Aashirvaad Shudh Chakki Atta 10kg', category: 'Company 3', unit: 'Bag of 2 Units', price: 780, stockQuantity: 90, minOrderQuantity: 1, imageUrl: '🌾', description: '100% whole wheat whole flour sacks', active: true },
+    { id: 16, sku: 'STP-004', name: 'Tata Salt Vacuum Evaporated 1kg', category: 'Company 3', unit: 'Sack of 25 Packs', price: 550, stockQuantity: 120, minOrderQuantity: 2, imageUrl: '🧂', description: 'Iodized refined cooking salt master sack', active: true },
+    { id: 17, sku: 'STP-005', name: 'MDH Deggi Mirch Powder 100g', category: 'Company 3', unit: 'Pack of 10 Boxes', price: 650, stockQuantity: 95, minOrderQuantity: 1, imageUrl: '🌶️', description: 'Rich red color mild spicy chilli blend', active: true },
+    { id: 18, sku: 'STP-006', name: 'Catch Super Garam Masala 100g', category: 'Company 3', unit: 'Pack of 10 Boxes', price: 750, stockQuantity: 80, minOrderQuantity: 1, imageUrl: '🌿', description: 'Authentic roasted spice mix for savory curries', active: true },
+    { id: 19, sku: 'DAR-001', name: 'Amul Butter Pasteurised 500g', category: 'Company 4', unit: 'Box of 20 Packs', price: 4900, stockQuantity: 45, minOrderQuantity: 1, imageUrl: '🧈', description: 'Pure dairy cream butter wholesale refrigerated pack', active: true },
+    { id: 20, sku: 'DAR-002', name: "Kellogg's Corn Flakes Original 475g", category: 'Company 4', unit: 'Case of 12 Packs', price: 2040, stockQuantity: 60, minOrderQuantity: 1, imageUrl: '🥣', description: 'Crispy toasted whole grain breakfast cereal', active: true },
+    { id: 21, sku: 'DAR-003', name: 'Quaker Whole Rolled Oats 1kg', category: 'Company 4', unit: 'Pack of 8 Pouches', price: 1440, stockQuantity: 55, minOrderQuantity: 1, imageUrl: '🥣', description: '100% natural wholegrain dietary fiber oats', active: true },
+    { id: 22, sku: 'DAR-004', name: 'Kissan Fresh Tomato Ketchup 1kg', category: 'Company 4', unit: 'Case of 12 Bottles', price: 1440, stockQuantity: 70, minOrderQuantity: 1, imageUrl: '🍅', description: 'Sweet tangy tomato ketchup squeezy bottles', active: true },
+    { id: 23, sku: 'DAR-005', name: 'Nutella Hazelnut Cocoa Spread 350g', category: 'Company 4', unit: 'Case of 6 Jars', price: 1920, stockQuantity: 40, minOrderQuantity: 1, imageUrl: '🍫', description: 'Creamy chocolate hazelnut breakfast spread', active: true },
+    { id: 24, sku: 'PER-001', name: 'Dettol Original Bath Soap 125g', category: 'Company 5', unit: 'Bundle of 16 Bars', price: 720, stockQuantity: 110, minOrderQuantity: 2, imageUrl: '🧼', description: 'Antibacterial trusted germ protection soap', active: true },
+    { id: 25, sku: 'PER-002', name: 'Colgate Strong Teeth Toothpaste 150g', category: 'Company 5', unit: 'Carton of 24 Tubes', price: 1680, stockQuantity: 95, minOrderQuantity: 1, imageUrl: '🪥', description: 'Calcium boosted cavity protection toothpaste', active: true },
+    { id: 26, sku: 'PER-003', name: 'Head & Shoulders Shampoo 180ml', category: 'Company 5', unit: 'Pack of 12 Bottles', price: 1920, stockQuantity: 60, minOrderQuantity: 1, imageUrl: '🧴', description: 'Smooth & silky anti-dandruff daily shampoo', active: true },
+    { id: 27, sku: 'PER-004', name: 'Lifebuoy Total Handwash Refill 750ml', category: 'Company 5', unit: 'Box of 8 Pouches', price: 880, stockQuantity: 85, minOrderQuantity: 1, imageUrl: '🧴', description: 'Fast acting antibacterial handwash liquid', active: true },
+    { id: 28, sku: 'PER-005', name: 'Nivea Soft Light Moisturizer 200ml', category: 'Company 5', unit: 'Pack of 6 Jars', price: 1500, stockQuantity: 50, minOrderQuantity: 1, imageUrl: '✨', description: 'Non-greasy nourishing skin cream with Vitamin E', active: true },
+    { id: 29, sku: 'HOU-001', name: 'Surf Excel Easy Wash Detergent 1kg', category: 'Company 4', unit: 'Bag of 10 Packs', price: 1350, stockQuantity: 90, minOrderQuantity: 1, imageUrl: '🧺', description: 'Advanced stain removal washing powder', active: true },
+    { id: 30, sku: 'HOU-002', name: 'Vim Lemon Dishwash Liquid 500ml', category: 'Company 4', unit: 'Pack of 12 Bottles', price: 1080, stockQuantity: 105, minOrderQuantity: 1, imageUrl: '🍋', description: 'Concentrated grease removal lemon dish gel', active: true }
   ],
   orders: [
     {
@@ -267,6 +267,51 @@ app.patch('/api/products/:id/stock', (req, res) => {
 
   product.stockQuantity = qty;
   res.json(product);
+});
+
+// Admin only: Add a new product to the catalog
+app.post('/api/products', (req, res) => {
+  const { requesterId, name, category, sku, unit, price, stockQuantity, minOrderQuantity, imageUrl, description } = req.body;
+
+  // Authorization: only administrators may add products
+  const requester = db.users.find(u => u.id === parseInt(requesterId));
+  if (!requester || requester.role !== 'ADMIN') {
+    return res.status(403).json({ error: 'Only administrators can add products' });
+  }
+
+  if (!name || !category || !unit) {
+    return res.status(400).json({ error: 'Name, category and packaging unit are required' });
+  }
+
+  const priceNum = Number(price);
+  if (!(priceNum > 0)) {
+    return res.status(400).json({ error: 'Price must be a positive number' });
+  }
+
+  const stockNum = Number(stockQuantity);
+  if (!Number.isInteger(stockNum) || stockNum < 0) {
+    return res.status(400).json({ error: 'Stock quantity must be a non-negative whole number' });
+  }
+
+  const minQtyNum = Number(minOrderQuantity);
+  const nextId = db.products.reduce((max, p) => Math.max(max, p.id), 0) + 1;
+
+  const newProduct = {
+    id: nextId,
+    sku: (sku && sku.trim()) || `SKU-${String(nextId).padStart(3, '0')}`,
+    name: name.trim(),
+    category: category.trim(),
+    unit: unit.trim(),
+    price: priceNum,
+    stockQuantity: stockNum,
+    minOrderQuantity: Number.isInteger(minQtyNum) && minQtyNum > 0 ? minQtyNum : 1,
+    imageUrl: (imageUrl && imageUrl.trim()) || '📦',
+    description: (description && description.trim()) || '',
+    active: true
+  };
+
+  db.products.push(newProduct);
+  res.status(201).json(newProduct);
 });
 
 // Orders
